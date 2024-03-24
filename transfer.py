@@ -16,11 +16,14 @@ def checkAllFiles(directory, convertList, poster, fanart):
             _, ext = os.path.splitext(filename)
             if ext.lower() in ['.mkv', '.mp4', '.rmvb', '.avi', '.wmv', '.ts']:  #设置视频文件格式后缀，缺少的自行增加
                 vsmetaPath = os.path.join(root, filename + '.vsmeta')
-                #以下两行代码用于删除已有vsmeta文件
+                #以下两行代码用于删除已有vsmeta文件可删除代码前#打开
                 #if os.path.exists(vsmetaPath):
                 #    os.remove(vsmetaPath)
-                posterPath = os.path.join(root, poster)
-                fanartPath = os.path.join(root, fanart)
+                #以下四行代码是用于设置封面，背景文件命是否带番号可删除代码前#打开
+                #posterPath = os.path.join(root, poster)#封面、背景文件不带番号的
+                #fanartPath = os.path.join(root, fanart)#封面、背景文件不带带番号的
+                 poster_path = os.path.join(root, os.path.splitext(filename)[0] + poster)#封面、背景文件带了番号的
+                 fanart_path = os.path.join(root, os.path.splitext(filename)[0] + fanart)#封面、背景文件带了番号的
                 if not os.path.exists(vsmetaPath):
                     nfoPath = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
                     convertList.append(nfoPath)
@@ -198,8 +201,8 @@ def toMd5(picFinal):
     return hashlib.md5(picFinal.encode("utf-8")).hexdigest()
 
 if __name__ == '__main__':
-    poster = 'poster.jpg'#封面图默认名
-    fanart = 'fanart.jpg'#背景图默认名
+    poster = '-poster.jpg'#封面图默认名
+    fanart = '-fanart.jpg'#背景图默认名
     directory = r'/volume1/video/Links/Movie/'
     convertList = []
     checkAllFiles(directory, convertList, poster, fanart)
