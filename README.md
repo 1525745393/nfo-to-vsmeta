@@ -1,6 +1,6 @@
 # nfo to vsmeta
 通过 Emby/Jellyfin/TinyMediaManager 等刮削到的nfo元数据，转换成群晖 Video Station 专用 vsmeta 元数据。共享刮削数据
-
+感谢原版大佬建议 更改代码自用版
 使用方法
 -----------------
 1. 保存 transfer.py 到群晖任意目录
