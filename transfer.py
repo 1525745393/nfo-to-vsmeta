@@ -22,8 +22,8 @@ def checkAllFiles(directory, convertList, poster, fanart):
                 #以下四行代码是用于设置封面，背景文件命是否带番号可删除代码前#打开
                 #posterPath = os.path.join(root, poster)#封面、背景文件不带番号的
                 #fanartPath = os.path.join(root, fanart)#封面、背景文件不带带番号的
-                poster_path = os.path.join(root, os.path.splitext(filename)[0] + poster)#背景文件带了番号的
-                fanart_path = os.path.join(root, os.path.splitext(filename)[0] + fanart)#封面、背景文件带了番号的
+                posterpath = os.path.join(root, os.path.splitext(filename)[0] + poster)#背景文件带了番号的
+                fanartpath = os.path.join(root, os.path.splitext(filename)[0] + fanart)#封面、背景文件带了番号的
                 if not os.path.exists(vsmetaPath):
                     nfoPath = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
                     convertList.append(nfoPath)
