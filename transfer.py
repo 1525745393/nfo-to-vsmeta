@@ -19,11 +19,11 @@ def checkAllFiles(directory, convertList, poster, fanart):
                 #以下两行代码用于删除已有vsmeta文件可删除代码前#打开
                 #if os.path.exists(vsmetaPath):
                 #    os.remove(vsmetaPath)
-                #以下四行代码是用于设置封面，背景文件命是否带番号可删除代码前#打开
-                #posterPath = os.path.join(root, poster)#封面、背景文件不带番号的
-                #fanartPath = os.path.join(root, fanart)#封面、背景文件不带带番号的
-                posterPath = os.path.join(root, os.path.splitext(filename)[0] + poster)#背景文件带了番号的
-                fanartPath = os.path.join(root, os.path.splitext(filename)[0] + fanart)#封面、背景文件带了番号的
+                #以下四行代码是用于设置封面，背景文件命是否带番号（删除代码前#打开或删除#关闭）
+                #posterPath = os.path.join(root, poster)#封面文件不带番号的
+                #fanartPath = os.path.join(root, fanart)#背景文件不带带番号的
+                posterPath = os.path.join(root, os.path.splitext(filename)[0] + poster)#封面文件带番号
+                fanartPath = os.path.join(root, os.path.splitext(filename)[0] + fanart)#背景文件带番号
                 if not os.path.exists(vsmetaPath):
                     nfoPath = os.path.join(root, os.path.splitext(filename)[0] + '.nfo')
                     convertList.append(nfoPath)
