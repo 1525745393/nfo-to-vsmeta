@@ -1,0 +1,74 @@
+
+群晖 Video Station .nfo 转 .vsmeta 工具 使用说明（v1.3）
+
+简介
+
+本工具用于将群晖 Video Station 中的 .nfo 元数据文件批量转换为 .vsmeta 文件，便于系统识别影片信息。v1.3 版本增强了路径管理、日志统计、执行控制等多个方面功能。
+
+
+---
+
+使用方法
+
+基本命令
+
+python vsmeta_converter_v1.3.py --root /path/to/your/videos
+
+
+---
+
+可用参数
+
+
+---
+
+功能特性（v1.3 新增）
+
+支持多个根目录参数 --root；
+
+支持路径列表文件 --root-file；
+
+支持 --overwrite-vsmeta 控制是否覆盖已有文件（默认不覆盖）；
+
+支持 --only-missing 仅转换缺失的 .vsmeta 文件；
+
+日志功能增强：每次执行生成独立日志，记录成功与失败，输出失败原因；
+
+执行统计摘要：总处理数、成功数、失败数与原因统计；
+
+默认递归扫描子目录，可通过 --no-recursive 禁用。
+
+
+
+---
+
+示例
+
+示例 1：批量转换单目录
+
+python vsmeta_converter_v1.3.py --root "/volume1/video"
+
+示例 2：同时处理多个路径
+
+python vsmeta_converter_v1.3.py --root "/volume1/video" --root "/volume2/media"
+
+示例 3：从文件加载路径并仅转换缺失项
+
+python vsmeta_converter_v1.3.py --root-file roots.txt --only-missing
+
+示例 4：强制覆盖已有 .vsmeta 并指定日志输出目录
+
+python vsmeta_converter_v1.3.py --root "/volume1/movie" --overwrite-vsmeta --log-dir "/var/log/vsmeta/"
+
+
+---
+
+输出日志
+
+每次执行将自动生成独立的日志文件（位于 logs/ 目录），文件名含时间戳，可用于后续分析。日志包含以下内容：
+
+每个视频的处理状态（成功、跳过、失败）；
+
+失败原因；
+
+执行统计摘要。
