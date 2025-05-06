@@ -1,0 +1,95 @@
+# vsmeta 群晖整合版 v1.1 中文使用说明
+
+本工具用于扫描 JAV 视频并自动生成 Emby/Jellyfin 可识别的 `.vsmeta` 元数据文件，并支持视频重命名、日志记录、群晖兼容性优化等功能。
+
+────────────────────────────────────────
+一、运行方式（推荐在群晖 DSM 控制台或终端）
+
+1. 进入脚本目录：
+   cd /volume1/你的脚本目录/vsmeta_synology_1.1
+
+2. 执行命令（自动读取 config.json）：
+   /usr/local/bin/python3 vsmeta_synology_1.1.py
+
+   # 如未安装 python3，可尝试以下命令之一：
+   python3 vsmeta_synology_1.1.py
+   /usr/bin/python3 vsmeta_synology_1.1.py
+
+3. 输出日志位于：
+   ./logs/log_日期时间.txt
+   ./logs/log_日期时间.json（如开启 JSON 日志）
+
+────────────────────────────────────────
+二、配置说明（config.json）
+
+支持字段如下，已内置自动补全和注释：
+
+{
+  "scan_root": "./JAV_output",                # 视频扫描根目录，建议设置为专用媒体路径
+  "output_vsmeta_dir": "",                    # 生成 vsmeta 保存路径，空则与视频同目录，推荐独立缓存盘
+  "thread_count": 4,                          # 并发线程数，推荐 4～8 之间，过高可能影响 NAS 性能
+  "skip_existing": true,                      # 跳过已存在 .vsmeta 的视频，避免重复生成
+  "rename_video": false,                      # 是否启用视频重命名功能，false 表示关闭
+  "rename_keep_original": true,               # 是否保留原文件副本，设为 false 则直接覆盖原名
+  "rename_skip_well_named": true,             # 跳过已命名规范的视频，false 则全部重命名
+  "rename_template": "{id}_{title}",          # 重命名模板，支持字段如 {id}、{title}、{actor} 等
+  "log_dir": "./logs",                        # 日志保存目录，推荐创建专用文件夹
+  "log_json": true,                           # 是否同时生成 JSON 格式日志
+  "dry_run": false,                           # 仅模拟处理不实际更改文件，推荐首次运行时开启
+  "nfo_dir": "",                              # 保留字段：如需从 nfo 转换为 vsmeta 可设定路径
+  "python_path": ""                           # 指定 python 路径，留空则自动查找（适配 DSM 系统）
+}
+
+────────────────────────────────────────
+三、功能更新（v1.0 → v1.1）
+
+- [新增] 支持更多视频格式（.mov, .wmv, .flv, .webm 等）
+- [新增] dry-run 模式，支持模拟运行（无写入操作）
+- [新增] 支持 JSON 格式日志输出，便于后续统计与集成
+- [新增] 自定义命名模板系统（支持任意字段组合）
+- [新增] 自动检测 DSM 系统 Python 路径，增强兼容性
+- [优化] 日志记录结构与异常捕获
+- [优化] 群晖用户配置体验与默认参数注释
+
+────────────────────────────────────────
+四、群晖 DSM 系统两种运行方式
+
+1. DSM 控制台任务计划方式（推荐）
+
+步骤如下：
+- 打开 DSM > 控制面板 > 任务计划
+- 新建任务 > 用户定义的脚本
+- 常规标签页中设置任务名如 "生成VSmeta"
+- 用户选择：root 或 admin
+- 脚本内容填入：
+cd /volume1/你的脚本目录/vsmeta_synology_1.1 /usr/local/bin/python3 vsmeta_synology_1.1.py
+
+- 可设定定期执行计划或手动运行
+
+2. DSM 内置终端 / SSH 执行方式
+
+- 打开“控制面板 > 终端与 SNMP”，启用 SSH 服务
+- 使用 SSH 工具连接群晖（如 Terminal / PuTTY）
+- 输入命令运行：
+cd /volume1/你的脚本目录/vsmeta_synology_1.1 /usr/local/bin/python3 vsmeta_synology_1.1.py
+
+────────────────────────────────────────
+五、注意事项
+
+- 默认不覆盖已有 .vsmeta 文件，可在配置中关闭 skip_existing
+- dry-run 模式建议首次运行启用，确认无误后关闭
+- 支持的视频格式：.mp4, .mkv, .avi, .mov, .wmv, .flv, .webm 等
+- 推荐将日志输出设为独立目录，避免干扰主目录内容
+
+────────────────────────────────────────
+六、目录结构说明
+
+vsmeta_synology_1.1/
+├── vsmeta_synology_1.1.py    # 主脚本（整合所有模块，群晖优化）
+├── config.json               # 配置文件（建议修改后使用）
+├── logs/                     # 运行日志输出目录
+├── readme.txt                # 中文说明文档
+├── changelog.txt             # 更新日志
+└── examples/
+  ├── example_config.json   # 示例配置
+  └── vsmeta_example.vsmeta # 示例生成文件
