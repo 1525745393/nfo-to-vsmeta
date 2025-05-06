@@ -1,0 +1,95 @@
+import os
+import argparse
+import json
+import time
+from datetime import datetime
+from utils import convert_nfo_to_vsmeta, scan_video_files, write_log, load_config
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Convert .nfo to .vsmeta for Synology Video Station")
+    parser.add_argument("--root", action="append", help="Root directory to scan (can specify multiple)")
+    parser.add_argument("--root-file", help="Path to text file listing scan directories (one per line)")
+    parser.add_argument("--skip-dirs", nargs="*", default=[], help="Subdirectories to skip")
+    parser.add_argument("--only-missing", action="store_true", help="Only convert if .vsmeta is missing")
+    parser.add_argument("--overwrite-vsmeta", action="store_true", default=False, help="Overwrite existing .vsmeta")
+    parser.add_argument("--force-refresh", action="store_true", help="Force refresh every item")
+    parser.add_argument("--delete-nfo", action="store_true", help="Delete .nfo after successful conversion")
+    parser.add_argument("--log-dir", default="logs", help="Directory to save logs")
+    parser.add_argument("--no-recursive", action="store_true", help="Disable recursive directory scanning")
+    parser.add_argument("--config", help="Path to config.json")
+    return parser.parse_args()
+
+def merge_config(args, config):
+    def cli_or_cfg(attr, cfg_key, default=None):
+        return getattr(args, attr, None) or config.get(cfg_key, default)
+
+    args.root = args.root or config.get("roots", [])
+    if args.root_file:
+        if os.path.exists(args.root_file):
+            with open(args.root_file, "r", encoding="utf-8") as f:
+                args.root += [line.strip() for line in f if line.strip()]
+    args.skip_dirs = args.skip_dirs or config.get("skip_dirs", [])
+    args.only_missing = args.only_missing or config.get("only_missing", False)
+    args.overwrite_vsmeta = args.overwrite_vsmeta or config.get("overwrite_vsmeta", False)
+    args.delete_nfo = args.delete_nfo or config.get("delete_nfo", False)
+    args.log_dir = args.log_dir or config.get("log_dir", "logs")
+    args.no_recursive = args.no_recursive or config.get("no_recursive", False)
+
+def main():
+    args = parse_args()
+    config = load_config(args.config) if args.config else {}
+    merge_config(args, config)
+
+    os.makedirs(args.log_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(args.log_dir, f"log_{timestamp}.txt")
+
+    video_files = []
+    for root in args.root:
+        if os.path.exists(root):
+            video_files += scan_video_files(root, args.skip_dirs, not args.no_recursive)
+        else:
+            print(f"[警告] 无效路径：{root}")
+
+    total = len(video_files)
+    success = 0
+    failed = 0
+    failure_details = []
+    start = time.time()
+
+    for video_path in video_files:
+        try:
+            result = convert_nfo_to_vsmeta(
+                video_path,
+                only_missing=args.only_missing,
+                overwrite=args.overwrite_vsmeta,
+                delete_nfo=args.delete_nfo,
+                force_refresh=args.force_refresh
+            )
+            if result:
+                success += 1
+            else:
+                failed += 1
+                failure_details.append(f"{video_path} -> [跳过或无效]")
+        except Exception as e:
+            failed += 1
+            failure_details.append(f"{video_path} -> {str(e)}")
+
+    end = time.time()
+    duration = end - start
+
+    summary = [
+        f"总计: {total}",
+        f"成功: {success}",
+        f"失败: {failed}",
+        f"耗时: {duration:.2f} 秒",
+    ]
+    if failure_details:
+        summary.append("\n[失败详情]")
+        summary += failure_details
+
+    write_log(log_path, summary)
+    print("\n".join(summary))
+
+if __name__ == "__main__":
+    main()
