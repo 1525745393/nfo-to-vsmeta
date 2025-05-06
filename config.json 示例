@@ -1,0 +1,9 @@
+{
+  "roots": [
+    "/volume1/video/adult",
+    "/volume1/video/movies"
+  ],
+  "threads": 4,
+  "delete_nfo": false,
+  "overwrite_vsmeta": false
+}
