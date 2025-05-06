@@ -1,0 +1,39 @@
+群晖 Video Station .nfo 转 .vsmeta 工具（v1.4）
+
+【功能简介】
+本工具可将符合 Video Station 标准的 .nfo 元数据文件转换为 .vsmeta 格式，支持多线程处理、日志记录、失败分析等功能，适用于影片整理与元数据维护场景。
+
+【v1.4 更新亮点】
+- 支持 config.json 配置文件统一管理；
+- 支持多个 --root 参数及外部路径列表文件 --root-file；
+- 支持统计处理总数、成功数、失败数，并记录失败原因；
+- 每次执行生成独立日志文件；
+- 增强覆盖控制，默认不覆盖 .vsmeta，可用 --overwrite 启用；
+- 默认跳过 Synology 特殊目录和系统文件；
+- 保持兼容 v1.3 所有功能。
+
+【使用方法】
+
+命令行参数：
+--root PATH            指定扫描路径（可重复使用多次）
+--root-file FILE       读取包含路径的文本文件
+--threads N            设置线程数（默认：4）
+--delete-nfo           转换成功后删除 .nfo 文件
+--overwrite            覆盖已有 .vsmeta 文件
+--config config.json   使用配置文件加载参数
+
+示例：
+python vsmeta_converter_v1.4.py --config config.json
+python vsmeta_converter_v1.4.py --root /volume1/video --threads 6 --overwrite
+
+【输出日志】
+每次执行将在当前目录生成以 log_时间戳.txt 命名的详细日志文件，记录所有成功与失败信息，以及汇总统计。
+
+【兼容性】
+Python 3.6+
+支持 Windows、Linux、macOS、Synology DSM 等环境
+
+【建议】
+- 使用 config.json 配合群晖计划任务可实现定时自动整理；
+- 使用 --overwrite 前建议备份原始数据；
+- 建议合理设置线程数避免 CPU 过载。
