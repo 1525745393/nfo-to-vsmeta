@@ -1,23 +1,12 @@
 {
-  "scan_root": "./JAV_output",  # 扫描的视频目录根路径，建议设为视频主目录；错误设置将导致无法扫描到视频
-  "output_vsmeta_dir": "",  # .vsmeta 输出目录，空则与视频同目录；建议设为独立缓存盘减少写入：如 "./vsmeta_output"
-  "thread_count": 4,  # 并发线程数，建议 4-8；过高可能导致系统负载过重
-  "skip_existing": true,  # 跳过已存在 .vsmeta 文件，节省时间；false 则会重新生成覆盖原文件
-
-  "rename_video": false,  # 是否启用视频重命名功能，建议初次使用关闭；开启后将重命名视频文件，可能影响原文件名识别（切换为 true）
-  "rename_keep_original": true,  # 重命名后是否保留原文件作为备份；false 将删除原始命名文件，仅保留新文件名
-  "rename_skip_well_named": true,  # 是否跳过已命名规范的视频文件；false 则强制对所有文件重命名（适合统一命名格式）
-
-  "rename_template": "{id} {title}",  # 自定义重命名模板，支持字段如 {id}、{title}、{actor}；错误模板会导致重命名失败
-  "rename_subtitle_rule": "match",  # 字幕匹配方式，match（匹配同名）或force（强制重命名）；force 可能导致字幕丢失匹配（切换为 "force"）
-  "rename_image_rule": "match",  # 封面匹配方式，match 或 force；建议使用 match，避免误改他人图片（切换为 "force"）
-
-  "log_dir": "./logs",  # 日志保存目录，建议使用专用路径避免主目录混乱
-  "log_format": "text",  # 日志格式，可选 "text" 或 "json"；使用 json 格式可用于后续统计分析（切换为 "json"）
-
-  "dry_run": false,  # 是否开启 dry-run 模式，开启后不对任何文件做改动，仅输出模拟结果；建议首次使用开启查看预览（切换为 true）
-
-  "nfo_dir": "",  # （预留）NFO 文件扫描路径，用于未来 nfo -> vsmeta 转换；为空则禁用该功能
-
-  "python_path": ""  # Python 执行路径，留空将自动识别常见路径（如 /usr/local/bin/python3）；必要时可手动设置
+  "scan_root": "./JAV_output",                # 扫描视频根目录 # 建议设为你的主整理路径 # 错误路径将导致视频无法被识别
+  "output_vsmeta_dir": "",                    # vsmeta 输出目录 # 空字符串代表与视频文件同目录 # 建议设置独立输出路径可提升群晖硬盘寿命
+  "thread_count": 4,                          # 并发线程数 # 建议设置为 4～8，视 NAS 性能调整 # 过高可能导致资源耗尽
+  "skip_existing": true,                      # 是否跳过已有 vsmeta 文件 # true 表示跳过已有文件 # false 表示强制覆盖
+  "rename_video": false,                      # 是否启用视频文件重命名 # 默认 false 保持文件名不变 # 改为 true 将按模板重命名
+  "rename_keep_original": true,               # 是否保留重命名前的原文件副本 # true 为保留副本 # false 将直接覆盖原名，建议慎用
+  "rename_skip_well_named": true,             # 跳过已规范命名的视频 # true 为跳过，false 为强制全部重命名
+  "log_dir": "./logs",                        # 日志输出目录 # 建议指定一个单独日志目录便于查看和清理
+  "nfo_dir": "",                              # 预留字段 # 未来支持 nfo -> vsmeta 转换时使用
+  "python_path": ""                           # Python 路径 # 空表示自动识别，也可手动设为 "/usr/local/bin/python3"
 }
