@@ -7,3 +7,6 @@
   "delete_nfo": false,
   "overwrite_vsmeta": false
 }
+
+
+python vsmeta_converter_v1.4.py --config config.json
