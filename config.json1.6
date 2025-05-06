@@ -1,0 +1,15 @@
+{
+  "scan_root": "./JAV_output", // 扫描目录，支持相对/绝对路径
+  "output_vsmeta_dir": "", // vsmeta 输出目录，留空为视频同目录，示例: "./vsmeta_output"
+  "thread_count": 4, // 并发线程数，推荐 4-8
+  "skip_existing": true, // 是否跳过已有 .vsmeta 的视频文件
+  "rename_video": false, // 是否启用视频重命名功能
+  "rename_keep_original": true, // 保留原视频名副本
+  "rename_skip_well_named": true, // 跳过已命名规范的文件
+  "rename_template": "{title}", // 命名模板，如 "{id}_{title}"，支持: {id}, {title}, {actor}
+  "log_dir": "./logs", // 日志保存路径
+  "nfo_dir": "", // 保留字段，未来支持 NFO 输入路径
+  "python_path": "", // 可指定群晖 Python 路径，如 "/usr/local/bin/python3"
+  "dry_run": false, // 仅预览执行效果，不实际更改任何文件
+  "log_format": "txt" // 可选: "txt" 或 "json"，日志格式
+}
