@@ -1,58 +1,28 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "VSmeta 配置文件校验规则",
   "type": "object",
   "properties": {
-    "scan_root": {
-      "type": "string"
-    },
-    "output_vsmeta_dir": {
-      "type": "string"
-    },
-    "thread_count": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 32
-    },
-    "skip_existing": {
-      "type": "boolean"
-    },
-    "rename_video": {
-      "type": "boolean"
-    },
-    "rename_keep_original": {
-      "type": "boolean"
-    },
-    "rename_skip_well_named": {
-      "type": "boolean"
-    },
-    "rename_template": {
-      "type": "string"
-    },
-    "rename_subtitle_rule": {
-      "type": "string",
-      "enum": ["match", "force"]
-    },
-    "rename_image_rule": {
-      "type": "string",
-      "enum": ["match", "force"]
-    },
-    "log_dir": {
-      "type": "string"
-    },
-    "log_format": {
-      "type": "string",
-      "enum": ["text", "json"]
-    },
-    "dry_run": {
-      "type": "boolean"
-    },
-    "nfo_dir": {
-      "type": "string"
-    },
-    "python_path": {
-      "type": "string"
-    }
+    "scan_root": { "type": "string" },
+    "output_vsmeta_dir": { "type": "string" },
+    "thread_count": { "type": "integer", "minimum": 1 },
+    "skip_existing": { "type": "boolean" },
+    "rename_video": { "type": "boolean" },
+    "rename_keep_original": { "type": "boolean" },
+    "rename_skip_well_named": { "type": "boolean" },
+    "log_dir": { "type": "string" },
+    "nfo_dir": { "type": "string" },
+    "python_path": { "type": "string" }
   },
-  "required": ["scan_root", "thread_count", "skip_existing", "rename_video", "log_dir"]
+  "required": [
+    "scan_root",
+    "output_vsmeta_dir",
+    "thread_count",
+    "skip_existing",
+    "rename_video",
+    "rename_keep_original",
+    "rename_skip_well_named",
+    "log_dir",
+    "nfo_dir",
+    "python_path"
+  ]
 }
