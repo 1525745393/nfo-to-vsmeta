@@ -1,0 +1,99 @@
+使用说明
+1. 环境要求
+Python 3.8 或更高版本
+必需的 Python 库（如未安装，请使用 pip install 安装）：
+bash
+pip install xml
+2. 配置文件说明
+脚本依赖一个名为 config.json 的配置文件，用户可以通过该文件自定义脚本行为。
+
+示例配置文件内容：
+JSON
+{
+    "directory": "./videos",               // 需要扫描的目录
+    "poster_suffix": "-poster.jpg",        // 海报文件的后缀
+    "fanart_suffix": "-fanart.jpg",        // 背景文件的后缀
+    "video_extensions": [".mp4", ".mkv"], // 支持的视频文件扩展名
+    "delete_vsmeta": false                 // 是否删除已有的 vsmeta 文件
+}
+参数说明：
+directory: 指定需要扫描的文件夹路径，所有符合条件的文件都会被处理。
+
+示例值："./videos" 表示当前目录下的 videos 文件夹。
+poster_suffix: 视频文件对应的海报文件后缀。
+
+示例值："-poster.jpg" 表示文件名为 [视频文件名]-poster.jpg。
+fanart_suffix: 视频文件对应的背景文件后缀。
+
+示例值："-fanart.jpg" 表示文件名为 [视频文件名]-fanart.jpg。
+video_extensions: 支持的视频扩展名列表。
+
+示例值：[".mp4", ".mkv"] 表示支持的文件扩展名为 .mp4 和 .mkv。
+delete_vsmeta: 是否删除已有的 .vsmeta 文件。
+
+true 表示删除，false 表示保留。
+3. 使用步骤
+第一步：准备环境
+确保已安装 Python 3.8 及以上版本。
+下载 nfo-to-vsmeta1.1.py 文件。
+确保目标目录下包含 .nfo 文件和对应的海报、背景文件。
+第二步：生成配置文件
+如果首次运行脚本且未提供 config.json 文件，脚本会自动生成一个默认配置文件 config.json。
+
+用户可以修改生成的配置文件以满足具体需求。
+第三步：运行脚本
+运行脚本并指定配置文件路径（如果需要）：
+
+bash
+python nfo-to-vsmeta1.1.py --config config.json
+如果未指定 --config 参数，脚本会默认从当前目录加载 config.json。
+4. 示例
+示例 1：扫描默认目录并生成 .vsmeta 文件
+假设文件目录结构如下：
+
+代码
+/videos
+  ├── movie1.mp4
+  ├── movie1.nfo
+  ├── movie1-poster.jpg
+  ├── movie1-fanart.jpg
+  ├── movie2.mkv
+  ├── movie2.nfo
+  └── ...
+运行脚本后，生成的 .vsmeta 文件如下：
+
+代码
+/videos
+  ├── movie1.mp4
+  ├── movie1.nfo
+  ├── movie1-poster.jpg
+  ├── movie1-fanart.jpg
+  ├── movie1.vsmeta       # 自动生成
+  ├── movie2.mkv
+  ├── movie2.nfo
+  ├── movie2.vsmeta       # 自动生成
+5. 日志
+脚本会将运行日志保存到 process.log 文件，并将关键日志输出到终端。
+
+日志示例：
+plaintext
+2025-05-11 17:30:00 - INFO - 加载配置成功
+2025-05-11 17:30:01 - INFO - 删除已有 vsmeta 文件: /videos/movie1.vsmeta
+2025-05-11 17:30:02 - INFO - 成功创建 vsmeta 文件: /videos/movie1.vsmeta
+2025-05-11 17:30:03 - INFO - 处理完成，共处理 2 个文件
+6. 注意事项
+确保 .nfo 文件格式正确，且与目标视频文件同名。
+确保对应的海报和背景文件存在，否则会跳过相关处理。
+如果启用了 delete_vsmeta，旧的 .vsmeta 文件将被删除，请谨慎操作。
+7. 高级功能
+1. 多线程加速
+脚本默认启用了多线程处理文件，用户无需额外配置即可享受性能提升。
+
+2. 自定义配置文件
+用户可以通过 --config 参数指定任意路径的配置文件，而不是默认的 config.json。
+
+3. 自动生成默认配置
+首次运行时，如果找不到配置文件，脚本会自动生成一个默认的 config.json 文件。
+
+如果有其他问题或需要进一步支持，请告诉我！
+
