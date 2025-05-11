@@ -1,12 +1,7 @@
 {
-  "roots": [
-    "/volume1/video/adult",
-    "/volume1/video/movies"
-  ],
-  "threads": 4,
-  "delete_nfo": false,
-  "overwrite_vsmeta": false
+    "directory": "./videos",               // 需要扫描的目录
+    "poster_suffix": "-poster.jpg",        // 海报文件的后缀
+    "fanart_suffix": "-fanart.jpg",        // 背景文件的后缀
+    "video_extensions": [".mp4", ".mkv"], // 支持的视频文件扩展名
+    "delete_vsmeta": false                 // 是否删除已有的 vsmeta 文件
 }
-
-
-python vsmeta_converter_v1.4.py --config config.json
