@@ -1,17 +1,8 @@
 {
-  "roots": [
-    "/volume1/video",
-    "/volume1/movies"
-  ],
-  "root_file": "",
-  "output_dir": "",
-  "log_dir": "./logs",
-  "skip_dirs": ["@eaDir", "extras"],
-  "force_refresh": false,
-  "only_missing": true,
-  "overwrite_vsmeta": false,
-  "recursive": true,
-  "threads": 4,
-  "delete_nfo": false,
-  "language": "zh"
+    "directory": "/volume1/MDC1/AV待整理/JAV_output",
+    "poster_suffix": "-poster.jpg",
+    "fanart_suffix": "-fanart.jpg",
+    "video_extensions": [".mkv", ".mp4", ".rmvb", ".avi", ".wmv", ".ts"],
+    "delete_vsmeta": true,
+    "log_file": "conversion.log"
 }
