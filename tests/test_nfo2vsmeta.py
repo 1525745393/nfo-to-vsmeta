@@ -9,6 +9,8 @@ import unittest
 import importlib.util
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)  # 让主脚本能 from version import __version__
 _spec = importlib.util.spec_from_file_location('nfo2vsmeta', os.path.join(ROOT, 'nfo-to-vsmeta.1.0.py'))
 n2v = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(n2v)

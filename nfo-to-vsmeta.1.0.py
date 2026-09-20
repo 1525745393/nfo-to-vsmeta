@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-nfo-to-vsmeta v1.1（统一版）
+nfo-to-vsmeta（统一版）
 将 Emby/Jellyfin/TinyMediaManager 等刮削生成的 .nfo 元数据，
 转换为群晖 Video Station 专用 .vsmeta 元数据文件，实现刮削数据复用。
 
-v1.1 新增（相对 v1.0.1）：
-1. TV 剧集支持：从文件名解析 SxxEyy / xx x yy / 结尾集号，写入 season/episode 字段；
-2. 提取 studio（制片厂）字段，可通过 studio_as_tagline 配置合并到 tagline（vsmeta 格式无独立 studio 字段）；
-3. nfo 解析健壮性：支持 CDATA / 混合内容文本提取，支持 GBK / 无 XML 声明编码自动回退；
-4. 合并原 transfer.py 能力：未识别文件提示、ignore_extensions 配置；
-5. --dry-run 干跑模式：只打印将转换的文件，不写盘；
-6. --verify 自检模式：转换后回读解析 vsmeta，校验字段完整性并写入日志；
-7. 日志轮转：限制日志文件大小与保留份数。
+版本号由同目录 version.py 提供（唯一权威源），运行 --version 查看。
 
 用法：
-    python3 nfo-to-vsmeta.1.0.py [--config config.json] [--dry-run] [--verify] [--log-file LOG]
+    python3 nfo-to-vsmeta.1.0.py [--config config.json] [--dry-run] [--verify] [--log-file LOG] [--version]
 """
 
 import os
@@ -30,6 +23,11 @@ import base64
 import xml.dom.minidom as xmldom
 from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import RotatingFileHandler
+
+try:
+    from version import __version__
+except ImportError:
+    __version__ = "unknown"
 
 try:
     from PIL import Image
@@ -601,6 +599,7 @@ def to_md5(content: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="nfo 转 vsmeta（统一版）")
+    parser.add_argument('--version', action='version', version=f"nfo-to-vsmeta {__version__}")
     parser.add_argument('--config', type=str, default="config.json", help="指定配置文件路径")
     parser.add_argument('--log-file', type=str, default=None, help="指定日志文件路径（覆盖配置文件）")
     parser.add_argument('--directory', type=str, default=None, help="指定扫描目录（覆盖配置文件）")

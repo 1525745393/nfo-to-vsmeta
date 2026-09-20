@@ -9,14 +9,18 @@
 | 文件 | 说明 |
 | --- | --- |
 | `nfo-to-vsmeta.1.0.py` | 统一版脚本（原 transfer.py 已合并至此）：支持配置、多线程、多目录、剧集季/集、完整元数据字段、图片压缩、干跑与自检 |
+| `version.py` | 版本号唯一权威源（SemVer），**需与主脚本同目录部署**；`--version` 输出它 |
 | `config.json` | 配置文件（示例见 `config.json 示例`） |
 | `使用教程v1.0` | 详细使用教程 |
+| `CHANGELOG.md` | 版本变更记录（Keep a Changelog 标准） |
+| `RELEASING.md` | 版本更新检查清单 |
+| `scripts/check_release.py` | 发布前自动验证（版本号/CHANGELOG 一致性 + 可选测试与 git tag） |
 | `tests/` | 单元测试（`python3 -m unittest discover -s tests`） |
-| `.github/workflows/test.yml` | GitHub Actions 自动测试（Python 3.8–3.12） |
+| `.github/workflows/test.yml` | GitHub Actions 自动测试 + 发布校验（Python 3.8–3.12） |
 
 ## 使用方法
 
-1. 将 `nfo-to-vsmeta.1.0.py` 和 `config.json` 保存到群晖任意目录；
+1. 将 `nfo-to-vsmeta.1.0.py`、`version.py` 和 `config.json` 保存到群晖任意目录（三个文件需在同一目录）；
 2. 编辑 `config.json`，将 `directory` 改为视频文件实际目录（建议配合 NasTool 使用硬链目录），海报/背景图后缀与刮削结果一致；
 3. 确认目录下每个视频有同名 `.nfo` 文件，以及同名海报/背景图（如 `xxx-poster.jpg`、`xxx-fanart.jpg`，可在配置中修改后缀）；
 4. 在群晖控制面板 > 任务计划，新增 > 计划的任务 > 用户定义的脚本；
@@ -38,6 +42,7 @@
 | `--dry-run` | 干跑模式：只打印将转换的文件，不写盘 |
 | `--verify` | 转换后回读 vsmeta 自检字段完整性，结果写入日志 |
 | `--log-file FILE` | 指定日志文件路径，覆盖配置 |
+| `--version` | 输出版本号（读取 version.py） |
 
 ## 功能特性
 
@@ -62,52 +67,6 @@
 
 ## 更新日志（CHANGELOG）
 
-### v1.1（统一版）— 2025-05-07
+完整变更记录见 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog 标准，变更分类：新增/修复/改进/废弃/移除/安全）。
 
-**新增**
-
-- TV 剧集支持：从文件名解析 `SxxEyy` / `xx x yy`，写入 vsmeta 的 season/episode 字段；
-- `--dry-run` 干跑模式：只打印将转换的文件，不写盘；
-- `--verify` 自检模式：转换后回读解析 vsmeta，校验年份/评分/季集等关键字段并写入日志；
-- 日志轮转（`log_max_bytes` / `log_backup_count` 配置）；
-- nfo 解析健壮性：支持 CDATA / 混合内容文本提取，支持 GBK / 无 XML 声明编码自动回退；
-- 提取 studio（制片厂）字段，`studio_as_tagline: true` 时合并进 tagline（vsmeta 格式无独立 studio 字段）；
-- 未识别文件提示（`ignore_extensions` 可配置忽略列表）。
-
-**修复**
-
-- 结尾数字解析（`Show.02`）改为配置开关 `parse_episode_from_trailing_digits`（默认关闭），并收紧为两位数字——修复 JAV 番号（如 `ABP-998`）与少数电影名被误判为剧集的问题；
-- `--verify` 对非数字年份不再抛异常，改为记录"年份格式异常"问题。
-
-**重构**
-
-- 合并原 transfer.py，统一为一个脚本，消除重复代码；
-- 新增单元测试套件（varint 边界、季集解析、编码回退、字段完整性、dry-run、自检、JAV 番号回归）与 GitHub Actions CI。
-
-### v1.0.1（修复版）— 2025-05-06
-
-**修复**
-
-- 修复增强版只写入标题/海报/背景图，丢失简介、年份、日期、分级、评分、类型、演员、导演、编剧等字段的问题；
-- 修复背景图（fanart）二进制结构写错导致群晖无法识别的问题；
-- 海报/背景图改为 76 字符换行 Base64 编码，与群晖 Video Station 期望格式一致；
-- 修复字段长度恰好为 128 字节时 varint 编码写出非法字节，导致整个文件后续字段错位的问题；
-- 修复图片压缩函数资源泄漏问题；
-- 修复可变默认参数等代码隐患。
-
-**新增**
-
-- 支持多目录扫描（`directory` 可为字符串或列表）；
-- 支持 `max_workers`（并发线程数）、`compress_image` / `compress_kb`（图片压缩开关与目标大小）、`log_file`（日志文件路径）等配置；
-- 配置文件自动合并默认值，缺失字段不再报错；
-- 未安装 Pillow 时自动降级为不压缩，功能不受影响。
-
-### v1.0 — 2025-05-01
-
-初始版本功能：
-
-- 将 .nfo 转换为 .vsmeta；
-- 支持递归扫描目录；
-- 自动识别影片名称与封面；
-- 基础 CLI 参数支持；
-- 支持群晖 Video Station 索引识别格式。
+版本更新流程见 [RELEASING.md](RELEASING.md)。
