@@ -1,5 +1,5 @@
 使用说明
-（对应 nfo-to-vsmeta.1.0.py 修复版 / transfer.py 修复版）
+（对应 nfo-to-vsmeta.1.0.py v1.1 统一版）
 
 1. 环境要求
 Python 3.8 或更高版本
@@ -10,7 +10,7 @@ Python 3.8 或更高版本
   未安装 Pillow 时脚本自动跳过压缩，直接使用原图，不影响转换功能。
 
 2. 配置文件说明
-脚本（nfo-to-vsmeta.1.0.py）默认读取同目录 config.json，用户可通过该文件自定义脚本行为。
+脚本默认读取同目录 config.json，可通过该文件自定义脚本行为。
 若配置文件不存在，首次运行会自动生成默认配置。
 
 示例配置文件内容（config.json）：
@@ -20,54 +20,73 @@ Python 3.8 或更高版本
     "poster_suffix": "-poster.jpg",
     "fanart_suffix": "-fanart.jpg",
     "video_extensions": [".mkv", ".mp4", ".rmvb", ".avi", ".wmv", ".ts"],
+    "ignore_extensions": [".vsmeta", ".jpg", ".jpeg", ".nfo", ".srt", ".ass", ".ssa", ".png", ".db", ".log"],
     "delete_vsmeta": false,
     "max_workers": 4,
     "compress_image": true,
     "compress_kb": 200,
-    "log_file": "process.log"
+    "log_file": "process.log",
+    "log_max_bytes": 1048576,
+    "log_backup_count": 3,
+    "studio_as_tagline": false
 }
 
 参数说明：
-- directory: 指定需要扫描的文件夹路径，所有符合条件的文件都会被处理。
+- directory: 需要扫描的文件夹路径。
   示例值："./videos" 表示当前目录下的 videos 文件夹；也支持列表形式，如 ["./videos", "./movies"]。
-- poster_suffix: 视频文件对应的海报文件后缀。
-  示例值："-poster.jpg" 表示文件名为 [视频文件名]-poster.jpg。
-- fanart_suffix: 视频文件对应的背景文件后缀。
-  示例值："-fanart.jpg" 表示文件名为 [视频文件名]-fanart.jpg。
-- video_extensions: 支持的视频扩展名列表。
-  示例值：[".mkv", ".mp4"] 表示支持的文件扩展名为 .mkv 和 .mp4。
-- delete_vsmeta: 是否先删除已有的 .vsmeta 文件再重新转换。
-  true 表示删除后重新转换，false 表示保留（已转换的自动跳过）。
+- poster_suffix: 视频文件对应的海报文件后缀。示例值："-poster.jpg" 表示 [视频文件名]-poster.jpg。
+- fanart_suffix: 视频文件对应的背景文件后缀。示例值："-fanart.jpg" 表示 [视频文件名]-fanart.jpg。
+- video_extensions: 支持的视频扩展名列表。示例值：[".mkv", ".mp4"]。
+- ignore_extensions: 扫描目录时忽略的文件扩展名，不认识的扩展名会打印"未识别文件"提示。
+- delete_vsmeta: 是否先删除已有的 .vsmeta 再重新转换。true 删除后重转，false 保留（已转换自动跳过）。
 - max_workers: 多线程并发数，默认 4。
 - compress_image: 是否压缩图片（需要安装 Pillow），默认 true。
 - compress_kb: 图片压缩目标大小（KB），默认 200。
 - log_file: 日志文件路径，默认 process.log。
+- log_max_bytes: 日志文件最大字节数，默认 1048576（1MB），超过后自动轮转。
+- log_backup_count: 日志轮转保留的备份份数，默认 3。
+- studio_as_tagline: vsmeta 格式没有独立的制片厂（studio）字段，设为 true 时把制片厂合并进 tagline（标语）显示。
 
-3. 使用步骤
+3. 命令行参数
+    python3 nfo-to-vsmeta.1.0.py [选项]
+
+- --config FILE: 指定配置文件路径，默认 config.json。
+- --directory DIR: 指定扫描目录，覆盖配置文件（也可用 --poster / --fanart 覆盖后缀）。
+- --dry-run: 干跑模式，只打印将转换的文件，不写盘。
+- --verify: 转换后回读 vsmeta 自检（校验年份、评分、季/集等字段），结果写入日志。
+- --log-file FILE: 指定日志文件路径，覆盖配置文件。
+
+常用示例：
+- 常规转换并自检：python3 nfo-to-vsmeta.1.0.py --config config.json --verify
+- 先干跑确认范围：python3 nfo-to-vsmeta.1.0.py --config config.json --dry-run
+- 直接指定目录（不依赖配置）：python3 nfo-to-vsmeta.1.0.py --directory /volume1/video/Links/Movie/
+
+4. 剧集支持
+脚本会自动从文件名解析季/集号并写入 vsmeta：
+- S01E02 / s01e02（季/集）
+- 1x2 / 3x05（季 x 集）
+- 结尾 2-3 位数字，如 xxx.02 / xxx - 12（视为第 1 季第 N 集）
+
+解析到季/集号时，vsmeta 会写入 season/episode 字段；电影文件名（如 Movie.2020）不受影响。
+剧集文件建议使用 SxxEyy 命名（NasTool 硬链输出默认即此格式）。
+
+5. 使用步骤
 第一步：准备环境
 确保已安装 Python 3.8 及以上版本。
 下载 nfo-to-vsmeta.1.0.py 文件。
 确保目标目录下包含 .nfo 文件和对应的海报、背景文件。
 
 第二步：生成配置文件
-首次运行脚本且未提供 config.json 文件时，脚本会自动生成默认配置文件 config.json。
+首次运行且未提供 config.json 时，脚本会自动生成默认配置文件。
 修改生成的配置文件以满足具体需求（主要是 directory、poster_suffix、fanart_suffix）。
 
-第三步：运行脚本
-运行脚本并指定配置文件路径（如果需要）：
+第三步：先干跑确认范围（可选）
+    python3 nfo-to-vsmeta.1.0.py --config config.json --dry-run
 
-    python3 nfo-to-vsmeta.1.0.py --config config.json
+第四步：正式运行
+    python3 nfo-to-vsmeta.1.0.py --config config.json --verify
 
-如果未指定 --config 参数，脚本会默认从当前目录加载 config.json。
-
-轻量版 transfer.py 的用法：
-
-    python3 transfer.py --directory /volume1/video/Links/Movie/
-
-也支持 --config、--poster、--fanart 参数覆盖配置。
-
-4. 示例
-示例 1：扫描默认目录并生成 .vsmeta 文件
+6. 示例
 假设文件目录结构如下：
 
     /videos
@@ -75,41 +94,40 @@ Python 3.8 或更高版本
       ├── movie1.nfo
       ├── movie1-poster.jpg
       ├── movie1-fanart.jpg
-      ├── movie2.mkv
-      ├── movie2.nfo
+      ├── Show.S01E02.mkv
+      ├── Show.S01E02.nfo
       └── ...
 
-运行脚本后，生成的 .vsmeta 文件如下：
+运行脚本后生成：
 
     /videos
       ├── movie1.mp4
       ├── movie1.nfo
       ├── movie1-poster.jpg
       ├── movie1-fanart.jpg
-      ├── movie1.vsmeta       # 自动生成
-      ├── movie2.mkv
-      ├── movie2.nfo
-      ├── movie2.vsmeta       # 自动生成
+      ├── movie1.vsmeta           # 自动生成（电影）
+      ├── Show.S01E02.mkv
+      ├── Show.S01E02.nfo
+      ├── Show.S01E02.mkv.vsmeta  # 自动生成（剧集，含季/集号）
+      └── ...
 
-5. 日志
-脚本会将运行日志保存到 log_file（默认 process.log），并将关键日志输出到终端。
+7. 日志
+脚本将运行日志写入 log_file（默认 process.log），超过 log_max_bytes 自动轮转，并在终端输出关键日志。
 
 日志示例：
 
     2025-05-11 17:30:00 - INFO - 加载配置成功
-    2025-05-11 17:30:01 - INFO - 删除已有 vsmeta 文件: /videos/movie1.vsmeta
-    2025-05-11 17:30:02 - INFO - 成功创建 vsmeta 文件: /videos/movie1.vsmeta
-    2025-05-11 17:30:03 - INFO - 本次处理完成：共 2 个文件成功生成 .vsmeta
+    2025-05-11 17:30:01 - INFO - 成功创建 vsmeta 文件: /videos/movie1.mkv.vsmeta
+    2025-05-11 17:30:02 - INFO - 自检通过: /videos/movie1.mkv.vsmeta
+    2025-05-11 17:30:03 - INFO - 本次处理完成：共 2 个文件，成功生成 2 个，失败 0 个，跳过 0 个
 
-6. 注意事项
+8. 注意事项
 - 确保 .nfo 文件格式正确，且与目标视频文件同名；
 - 确保对应的海报和背景文件存在，否则会跳过相关处理；
 - 如果启用了 delete_vsmeta，旧的 .vsmeta 文件将被删除，请谨慎操作；
-- 重置元数据后，需在群晖 设置 > 视频库 > 再次搜索所有视频信息 刷新缓存。
+- 重置元数据后，需在群晖 设置 > 视频库 > 再次搜索所有视频信息 刷新缓存；
+- 建议把日志文件（process.log）放在扫描目录之外，或依赖默认忽略列表中的 .log 扩展名。
 
-7. 高级功能
-1. 多线程加速：通过 max_workers 配置并发线程数，默认 4。
-2. 多目录扫描：directory 配置为列表即可一次处理多个路径。
-3. 自定义配置文件：通过 --config 参数指定任意路径的配置文件。
-4. 自动生成默认配置：首次运行时，如果找不到配置文件，脚本会自动生成。
-5. 图片压缩：安装 Pillow 后自动将海报/背景图压缩至 compress_kb（默认 200KB）以内，减小 vsmeta 体积。
+9. 测试
+仓库自带单元测试（无需第三方依赖）：
+    python3 -m unittest discover -s tests

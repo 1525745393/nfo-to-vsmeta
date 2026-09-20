@@ -8,12 +8,13 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `nfo-to-vsmeta.1.0.py` | **推荐使用**。增强版：支持 config.json 配置、多线程、多目录扫描、完整元数据字段、可选图片压缩 |
-| `transfer.py` | 轻量版：单目录扫描，逻辑简单直观，含图片压缩（需 Pillow） |
+| `nfo-to-vsmeta.1.0.py` | 统一版脚本（原 transfer.py 已合并至此）：支持配置、多线程、多目录、剧集季/集、完整元数据字段、图片压缩、干跑与自检 |
 | `config.json` | 配置文件（示例见 `config.json 示例`） |
 | `使用教程v1.0` | 详细使用教程 |
+| `tests/` | 单元测试（`python3 -m unittest discover -s tests`） |
+| `.github/workflows/test.yml` | GitHub Actions 自动测试（Python 3.8–3.12） |
 
-## 使用方法（推荐：nfo-to-vsmeta.1.0.py）
+## 使用方法
 
 1. 将 `nfo-to-vsmeta.1.0.py` 和 `config.json` 保存到群晖任意目录；
 2. 编辑 `config.json`，将 `directory` 改为视频文件实际目录（建议配合 NasTool 使用硬链目录），海报/背景图后缀与刮削结果一致；
@@ -23,18 +24,30 @@
 6. 自定义脚本栏输入命令（注意修改路径为实际保存脚本的路径）：
 
    ```bash
-   python3 /volume1/xxx/nfo-to-vsmeta.1.0.py --config /volume1/xxx/config.json
+   python3 /volume1/xxx/nfo-to-vsmeta.1.0.py --config /volume1/xxx/config.json --verify
    ```
 
 7. 已转换过的不会重复转换。如需重置，可将 `config.json` 中 `delete_vsmeta` 改为 `true` 再运行一次（会自动删除所有 `.vsmeta` 并重新转换），之后建议改回 `false`；重置后需手动点 设置 > 视频库 > 再次搜索所有视频信息 刷新元数据缓存。
 
-### 使用 transfer.py（轻量版）
+## 命令行参数
 
-```bash
-python3 transfer.py --directory /volume1/video/Links/Movie/
-```
+| 参数 | 说明 |
+| --- | --- |
+| `--config FILE` | 指定配置文件路径（默认 `config.json`） |
+| `--directory DIR` | 指定扫描目录，覆盖配置（也支持 `--poster` / `--fanart` 覆盖后缀） |
+| `--dry-run` | 干跑模式：只打印将转换的文件，不写盘 |
+| `--verify` | 转换后回读 vsmeta 自检字段完整性，结果写入日志 |
+| `--log-file FILE` | 指定日志文件路径，覆盖配置 |
 
-也支持 `--config`、`--poster`、`--fanart` 参数，未指定时读取同目录 `config.json`。
+## 功能特性
+
+- **电影 + 剧集**：自动从文件名解析季/集号（`S01E02` / `1x2` / 结尾 2-3 位数字），剧集写入 season/episode 字段；
+- **完整元数据**：标题、副标题、标语、简介、年份、日期、分级、评分、类型、演员、导演、编剧；
+- **图片压缩**：已安装 Pillow 时自动把海报/背景图压缩至 `compress_kb`（默认 200KB）以内；
+- **多目录**：`directory` 可填列表一次处理多个路径；
+- **日志轮转**：`log_file` 超过 `log_max_bytes` 自动轮转，保留 `log_backup_count` 份；
+- **健壮解析**：支持 CDATA/混合内容文本，支持 GBK 等编码自动回退；
+- **自检**：`--verify` 转换后回读校验年份、评分、季/集等关键字段。
 
 ## 环境要求
 
@@ -48,6 +61,23 @@ python3 transfer.py --directory /volume1/video/Links/Movie/
 ---
 
 ## 更新日志（CHANGELOG）
+
+### v1.1（统一版）— 2025-05-07
+
+**新增**
+
+- TV 剧集支持：从文件名解析 `SxxEyy` / `xx x yy` / 结尾集号，写入 vsmeta 的 season/episode 字段；
+- `--dry-run` 干跑模式：只打印将转换的文件，不写盘；
+- `--verify` 自检模式：转换后回读解析 vsmeta，校验年份/评分/季集等关键字段并写入日志；
+- 日志轮转（`log_max_bytes` / `log_backup_count` 配置）；
+- nfo 解析健壮性：支持 CDATA / 混合内容文本提取，支持 GBK / 无 XML 声明编码自动回退；
+- 提取 studio（制片厂）字段，`studio_as_tagline: true` 时合并进 tagline（vsmeta 格式无独立 studio 字段）；
+- 未识别文件提示（`ignore_extensions` 可配置忽略列表）。
+
+**重构**
+
+- 合并原 transfer.py，统一为一个脚本，消除重复代码；
+- 新增单元测试套件（varint 边界、季集解析、编码回退、字段完整性、dry-run、自检）与 GitHub Actions CI。
 
 ### v1.0.1（修复版）— 2025-05-06
 
