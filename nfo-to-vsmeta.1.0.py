@@ -304,7 +304,7 @@ def write_string(ba: bytearray, string: str):
 
 
 def write_int(ba: bytearray, length: int):
-    while length > 128:
+    while length >= 128:  # 注意边界：128 需编码为 [0x80, 0x01]，不能用单字节 0x80
         write_byte(ba, length % 128 + 128)
         length = length // 128
     write_byte(ba, length)
