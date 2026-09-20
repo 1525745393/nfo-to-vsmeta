@@ -23,7 +23,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: 发布前验证（版本号/CHANGELOG/单元测试/git tag）
         run: python scripts/check_release.py --run-tests --check-tag

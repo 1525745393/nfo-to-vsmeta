@@ -178,7 +178,7 @@ def main():
         check_changelog(args.repo_root, version, checks)
         if args.run_tests:
             run_tests(args.repo_root, checks)
-        if args.check-tag:
+        if args.check_tag:
             check_tag(version, checks)
     except Exception as e:
         fail(checks, f"验证脚本运行异常：{e}")
