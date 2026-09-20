@@ -139,10 +139,11 @@ def run_tests(repo_root, checks):
 
 
 def check_tag(version, checks):
+    """校验 git tag 已存在：v<版本> 或预发布 v<版本>-rcN（如 v1.3.0-rc1）"""
     tag = f"v{version}"
     try:
         result = subprocess.run(
-            ["git", "tag", "-l", tag],
+            ["git", "tag", "-l"],
             capture_output=True,
             text=True,
             timeout=30,
@@ -150,8 +151,10 @@ def check_tag(version, checks):
     except Exception as e:
         fail(checks, f"无法查询 git tag：{e}")
         return
-    if tag in result.stdout.split():
-        pass_ok(checks, f"git tag {tag} 已存在")
+    tags = result.stdout.split()
+    matched = any(t == tag or t.startswith(tag + "-") for t in tags)
+    if matched:
+        pass_ok(checks, f"git tag {tag}（或预发布 {tag}-*）已存在")
     else:
         fail(checks, f"git tag {tag} 不存在（发布前请先打 tag）")
 
@@ -175,7 +178,7 @@ def main():
         check_changelog(args.repo_root, version, checks)
         if args.run_tests:
             run_tests(args.repo_root, checks)
-        if args.check_tag:
+        if args.check-tag:
             check_tag(version, checks)
     except Exception as e:
         fail(checks, f"验证脚本运行异常：{e}")
