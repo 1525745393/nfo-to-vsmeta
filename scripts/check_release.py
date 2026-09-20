@@ -156,6 +156,7 @@ def main():
     args = parser.parse_args()
 
     checks = []
+    version = None
     try:
         version = load_version(args.repo_root)
         check_semver(version, checks)
@@ -167,7 +168,7 @@ def main():
     except Exception as e:
         fail(checks, f"验证脚本运行异常：{e}")
 
-    print(f"== 发布前验证（version={'version' if 'version' in locals() else '?'}）==")
+    print(f"== 发布前验证（version={version or '?'}）==")
     for status, msg in checks:
         print(f"  [{status}] {msg}")
 
