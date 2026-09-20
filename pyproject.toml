@@ -1,0 +1,25 @@
+# 开发工具配置（Linter / 类型检查 / 发布打包）
+# 注意：本项目运行时不需要安装任何第三方依赖，本文件仅服务于 CI 质量检查。
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+exclude = [".git", ".github", "__pycache__", "dist"]
+
+[tool.ruff.lint]
+# 显式锁定规则集（ruff 官方默认核心规则），避免受环境级配置影响
+select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+# 注：mypy 2.x 最低支持检查目标为 3.10；本仓库代码不含 3.9+ 独有语法，
+# 运行时 3.8 兼容性由 CI 的 Python 3.8-3.12 测试矩阵保障。
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+files = [
+    "nfo-to-vsmeta.1.0.py",
+    "version.py",
+    "scripts/check_release.py",
+    "scripts/build_release.py",
+    "tests/test_nfo2vsmeta.py",
+]

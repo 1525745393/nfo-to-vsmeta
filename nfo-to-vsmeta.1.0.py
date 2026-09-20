@@ -23,6 +23,7 @@ import base64
 import xml.dom.minidom as xmldom
 from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import RotatingFileHandler
+from typing import Union
 
 try:
     from version import __version__
@@ -31,26 +32,38 @@ except ImportError:
 
 try:
     from PIL import Image
+
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
 
 # 示例配置内容
 DEFAULT_CONFIG = {
-    "directory": "./videos",                 # 需要扫描的目录（也可填列表，如 ["./videos", "./movies"]）
-    "poster_suffix": "-poster.jpg",          # 海报文件的后缀
-    "fanart_suffix": "-fanart.jpg",          # 背景文件的后缀
+    "directory": "./videos",  # 需要扫描的目录（也可填列表，如 ["./videos", "./movies"]）
+    "poster_suffix": "-poster.jpg",  # 海报文件的后缀
+    "fanart_suffix": "-fanart.jpg",  # 背景文件的后缀
     "video_extensions": [".mkv", ".mp4", ".rmvb", ".avi", ".wmv", ".ts"],  # 支持的视频文件扩展名
-    "ignore_extensions": [".vsmeta", ".jpg", ".jpeg", ".nfo", ".srt", ".ass", ".ssa", ".png", ".db", ".log"],  # 扫描时忽略的文件扩展名
-    "delete_vsmeta": False,                  # 是否先删除已有的 vsmeta 文件再重新转换
-    "max_workers": 4,                        # 多线程并发数
-    "compress_image": True,                  # 是否压缩图片（需要安装 Pillow，未安装时自动跳过压缩）
-    "compress_kb": 200,                      # 图片压缩目标大小（KB）
-    "log_file": "process.log",               # 日志文件路径
-    "log_max_bytes": 1048576,                # 日志文件最大字节数（默认 1MB），超过后轮转
-    "log_backup_count": 3,                   # 日志轮转保留的备份份数
-    "studio_as_tagline": False,              # vsmeta 无独立 studio 字段，True 时把制片厂合并进 tagline
-    "parse_episode_from_trailing_digits": False  # 是否从结尾2位数字解析集号（如 Show.02）；JAV 番号类命名请保持关闭
+    "ignore_extensions": [
+        ".vsmeta",
+        ".jpg",
+        ".jpeg",
+        ".nfo",
+        ".srt",
+        ".ass",
+        ".ssa",
+        ".png",
+        ".db",
+        ".log",
+    ],  # 扫描时忽略的文件扩展名
+    "delete_vsmeta": False,  # 是否先删除已有的 vsmeta 文件再重新转换
+    "max_workers": 4,  # 多线程并发数
+    "compress_image": True,  # 是否压缩图片（需要安装 Pillow，未安装时自动跳过压缩）
+    "compress_kb": 200,  # 图片压缩目标大小（KB）
+    "log_file": "process.log",  # 日志文件路径
+    "log_max_bytes": 1048576,  # 日志文件最大字节数（默认 1MB），超过后轮转
+    "log_backup_count": 3,  # 日志轮转保留的备份份数
+    "studio_as_tagline": False,  # vsmeta 无独立 studio 字段，True 时把制片厂合并进 tagline
+    "parse_episode_from_trailing_digits": False,  # 是否从结尾2位数字解析集号（如 Show.02）；JAV 番号类命名请保持关闭
 }
 
 # vsmeta 二进制 tag 定义（参考 VideoStation VsMeta File Format）
@@ -68,8 +81,8 @@ TAG_CLASSIFICATION = 0x5A
 TAG_RATING = 0x60
 TAG_EPISODE_THUMB_DATA = 0x8A
 TAG_EPISODE_THUMB_MD5 = 0x92
-TAG_GROUP2 = 0x9A          # 剧集分组：season/episode/tvshow 信息
-TAG_FANART = 0xAA          # 本脚本使用的背景图分组
+TAG_GROUP2 = 0x9A  # 剧集分组：season/episode/tvshow 信息
+TAG_FANART = 0xAA  # 本脚本使用的背景图分组
 TAG1_CAST = 0x0A
 TAG1_DIRECTOR = 0x12
 TAG1_GENRE = 0x1A
@@ -89,8 +102,10 @@ def setup_logging(log_file: str = "process.log", max_bytes: int = 1048576, backu
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.handlers.clear()
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count, encoding='utf-8')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+    )
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -101,7 +116,7 @@ def setup_logging(log_file: str = "process.log", max_bytes: int = 1048576, backu
 def create_default_config(config_file: str):
     """创建默认配置文件"""
     try:
-        with open(config_file, 'w', encoding='utf-8') as file:
+        with open(config_file, "w", encoding="utf-8") as file:
             json.dump(DEFAULT_CONFIG, file, ensure_ascii=False, indent=4)
         logging.info(f"默认配置文件已创建: {config_file}")
     except IOError as e:
@@ -113,7 +128,7 @@ def load_config(config_file: str = "config.json") -> dict:
     if not os.path.exists(config_file):
         logging.warning(f"配置文件 {config_file} 不存在，创建默认配置文件...")
         create_default_config(config_file)
-    with open(config_file, 'r', encoding='utf-8') as file:
+    with open(config_file, "r", encoding="utf-8") as file:
         config = json.load(file)
     # 合并默认值，避免配置项缺失时报错
     for key, value in DEFAULT_CONFIG.items():
@@ -123,11 +138,11 @@ def load_config(config_file: str = "config.json") -> dict:
 
 def scan_directory(directory: str, config: dict) -> list:
     """递归扫描目录，返回 (root, filename) 视频任务列表；未识别文件仅提示"""
-    video_ext = [e.lower() for e in config['video_extensions']]
-    ignore_ext = [e.lower() for e in config.get('ignore_extensions', [])]
+    video_ext = [e.lower() for e in config["video_extensions"]]
+    ignore_ext = [e.lower() for e in config.get("ignore_extensions", [])]
     tasks = []
     for root, _, files in os.walk(directory):
-        if '@eaDir' in root:
+        if "@eaDir" in root:
             continue
         for filename in files:
             _, ext = os.path.splitext(filename)
@@ -141,10 +156,10 @@ def scan_directory(directory: str, config: dict) -> list:
 
 def process_files(config: dict, dry_run: bool = False, verify: bool = False) -> dict:
     """多线程处理文件，返回统计信息"""
-    directories = config['directory']
+    directories = config["directory"]
     if isinstance(directories, str):
         directories = [directories]
-    max_workers = int(config.get('max_workers', 4))
+    max_workers = int(config.get("max_workers", 4))
 
     tasks = []
     for directory in directories:
@@ -176,17 +191,19 @@ def process_files(config: dict, dry_run: bool = False, verify: bool = False) -> 
     return stats
 
 
-def process_single_file(root: str, filename: str, config: dict, dry_run: bool = False, verify: bool = False) -> str:
+def process_single_file(
+    root: str, filename: str, config: dict, dry_run: bool = False, verify: bool = False
+) -> str:
     """处理单个文件，返回状态：success / failed / skipped"""
-    poster_suffix = config['poster_suffix']
-    fanart_suffix = config['fanart_suffix']
-    delete_vsmeta = config.get('delete_vsmeta', False)
+    poster_suffix = config["poster_suffix"]
+    fanart_suffix = config["fanart_suffix"]
+    delete_vsmeta = config.get("delete_vsmeta", False)
 
-    vsmeta_path = os.path.join(root, filename + '.vsmeta')
+    vsmeta_path = os.path.join(root, filename + ".vsmeta")
     base_name = os.path.splitext(filename)[0]
     poster_path = os.path.join(root, base_name + poster_suffix)
     fanart_path = os.path.join(root, base_name + fanart_suffix)
-    nfo_path = os.path.join(root, base_name + '.nfo')
+    nfo_path = os.path.join(root, base_name + ".nfo")
 
     # 删除已有的 vsmeta 文件
     if delete_vsmeta and os.path.exists(vsmeta_path):
@@ -210,15 +227,16 @@ def process_single_file(root: str, filename: str, config: dict, dry_run: bool = 
 
         metadata = parse_nfo(nfo_path)
         season, episode = parse_season_episode(
-            filename, config.get('parse_episode_from_trailing_digits', False))
+            filename, config.get("parse_episode_from_trailing_digits", False)
+        )
         buf = build_vsmeta_content(metadata, poster_path, fanart_path, config, season, episode)
 
-        with open(vsmeta_path, 'wb') as op:
+        with open(vsmeta_path, "wb") as op:
             op.write(buf)
         logging.info(f"成功创建 vsmeta 文件: {vsmeta_path}")
 
         if verify:
-            ok, issues = verify_vsmeta(buf, metadata, season, episode)
+            ok, issues = verify_vsmeta(bytes(buf), metadata, season, episode)
             if ok:
                 logging.info(f"自检通过: {vsmeta_path}")
             else:
@@ -231,18 +249,18 @@ def process_single_file(root: str, filename: str, config: dict, dry_run: bool = 
 
 def parse_nfo(nfo_path: str) -> dict:
     """解析 nfo 文件（自动处理编码与 CDATA），返回元数据字典"""
-    with open(nfo_path, 'rb') as f:
+    with open(nfo_path, "rb") as f:
         raw = f.read()
     # 编码探测：UTF-8（含 BOM）→ GB18030 → Latin-1（兜底，保证不崩溃）
     text = None
-    for encoding in ('utf-8-sig', 'gb18030', 'latin-1'):
+    for encoding in ("utf-8-sig", "gb18030", "latin-1"):
         try:
             text = raw.decode(encoding)
             break
         except (UnicodeDecodeError, LookupError):
             continue
     if text is None:
-        text = raw.decode('utf-8', errors='replace')
+        text = raw.decode("utf-8", errors="replace")
 
     try:
         doc = xmldom.parseString(text)
@@ -250,19 +268,19 @@ def parse_nfo(nfo_path: str) -> dict:
         raise ValueError(f"XML 解析失败: {e}")
 
     return {
-        'title': get_node(doc, 'title', '无标题'),
-        'sorttitle': get_node(doc, 'sorttitle', ''),
-        'tagline': get_node(doc, 'tagline', ''),
-        'plot': get_node(doc, 'plot'),
-        'year': get_node(doc, 'year', '1900'),
-        'level': get_node(doc, 'mpaa', 'G'),
-        'date': get_node(doc, 'premiered', '1900-01-01'),
-        'rate': get_node(doc, 'rating', '0'),
-        'genre': get_node_list(doc, 'genre'),
-        'actors': get_node_list(doc, 'actor', 'name'),
-        'directors': get_node_list(doc, 'director'),
-        'writers': get_node_list(doc, 'writer'),
-        'studio': get_node_list(doc, 'studio'),
+        "title": get_node(doc, "title", "无标题"),
+        "sorttitle": get_node(doc, "sorttitle", ""),
+        "tagline": get_node(doc, "tagline", ""),
+        "plot": get_node(doc, "plot"),
+        "year": get_node(doc, "year", "1900"),
+        "level": get_node(doc, "mpaa", "G"),
+        "date": get_node(doc, "premiered", "1900-01-01"),
+        "rate": get_node(doc, "rating", "0"),
+        "genre": get_node_list(doc, "genre"),
+        "actors": get_node_list(doc, "actor", "name"),
+        "directors": get_node_list(doc, "director"),
+        "writers": get_node_list(doc, "writer"),
+        "studio": get_node_list(doc, "studio"),
     }
 
 
@@ -271,11 +289,11 @@ def parse_season_episode(filename: str, enable_trailing_digits: bool = False):
     无法识别返回 (None, None)"""
     base = os.path.splitext(os.path.basename(filename))[0]
 
-    m = re.search(r'[Ss](\d{1,2})[Ee](\d{1,3})', base)
+    m = re.search(r"[Ss](\d{1,2})[Ee](\d{1,3})", base)
     if m:
         return int(m.group(1)), int(m.group(2))
 
-    m = re.search(r'(\d{1,2})[xX](\d{1,3})', base)
+    m = re.search(r"(\d{1,2})[xX](\d{1,3})", base)
     if m:
         return int(m.group(1)), int(m.group(2))
 
@@ -283,15 +301,16 @@ def parse_season_episode(filename: str, enable_trailing_digits: bool = False):
     # 默认关闭：JAV 番号（如 ABP-998、STARS-061）与少数电影名会误判为剧集，
     # 仅当配置 parse_episode_from_trailing_digits=true 时启用。
     if enable_trailing_digits:
-        m = re.search(r'[ _\-.]\d{2}$', base)
+        m = re.search(r"[ _\-.]\d{2}$", base)
         if m:
-            return 1, int(m.group(0).strip(' _-.'))
+            return 1, int(m.group(0).strip(" _-. "))
 
     return None, None
 
 
-def build_vsmeta_content(metadata: dict, poster_path: str, fanart_path: str, config: dict,
-                         season=None, episode=None) -> bytearray:
+def build_vsmeta_content(
+    metadata: dict, poster_path: str, fanart_path: str, config: dict, season=None, episode=None
+) -> bytearray:
     """根据元数据构建 vsmeta 文件内容（与群晖 Video Station 可识别的二进制格式一致）"""
     buf, group = bytearray(), bytearray()
 
@@ -300,11 +319,11 @@ def build_vsmeta_content(metadata: dict, poster_path: str, fanart_path: str, con
     write_byte(buf, 0x01)
 
     # 标题
-    title = metadata['title']
-    sorttitle = metadata['sorttitle'] or title
-    tagline = metadata['tagline'] or title
-    if config.get('studio_as_tagline') and metadata.get('studio'):
-        tagline = (tagline + ' · ' + ' / '.join(metadata['studio'])).strip(' ·')
+    title = metadata["title"]
+    sorttitle = metadata["sorttitle"] or title
+    tagline = metadata["tagline"] or title
+    if config.get("studio_as_tagline") and metadata.get("studio"):
+        tagline = (tagline + " · " + " / ".join(metadata["studio"])).strip(" ·")
 
     write_byte(buf, TAG_SHOW_TITLE)
     write_string(buf, title)
@@ -317,11 +336,11 @@ def build_vsmeta_content(metadata: dict, poster_path: str, fanart_path: str, con
 
     # 年份
     write_byte(buf, TAG_YEAR)
-    write_int(buf, int(metadata['year']))
+    write_int(buf, int(metadata["year"]))
 
     # 上映/首播日期
     write_byte(buf, TAG_EPISODE_RELEASE_DATE)
-    write_string(buf, metadata['date'])
+    write_string(buf, metadata["date"])
 
     # 锁定标志
     write_byte(buf, TAG_EPISODE_LOCKED)
@@ -329,26 +348,26 @@ def build_vsmeta_content(metadata: dict, poster_path: str, fanart_path: str, con
 
     # 简介
     write_byte(buf, TAG_CHAPTER_SUMMARY)
-    write_string(buf, metadata['plot'])
+    write_string(buf, metadata["plot"])
 
     # 剧集元数据 JSON（保留 null）
     write_byte(buf, TAG_EPISODE_META_JSON)
-    write_string(buf, 'null')
+    write_string(buf, "null")
 
     # 人员分组（演员/导演/类型/编剧）
-    for a in metadata['actors']:
+    for a in metadata["actors"]:
         write_byte(group, TAG1_CAST)
         write_string(group, a)
 
-    for d in metadata['directors']:
+    for d in metadata["directors"]:
         write_byte(group, TAG1_DIRECTOR)
         write_string(group, d)
 
-    for g in metadata['genre']:
+    for g in metadata["genre"]:
         write_byte(group, TAG1_GENRE)
         write_string(group, g)
 
-    for w in metadata['writers']:
+    for w in metadata["writers"]:
         write_byte(group, TAG1_WRITER)
         write_string(group, w)
 
@@ -359,11 +378,11 @@ def build_vsmeta_content(metadata: dict, poster_path: str, fanart_path: str, con
 
     # 分级
     write_byte(buf, TAG_CLASSIFICATION)
-    write_string(buf, metadata['level'])
+    write_string(buf, metadata["level"])
 
     # 评分（0-10 放大 10 倍存储）
     try:
-        rate_value = int(float(metadata['rate']) * 10)
+        rate_value = int(float(metadata["rate"]) * 10)
     except ValueError:
         rate_value = 0
     write_byte(buf, TAG_RATING)
@@ -426,9 +445,9 @@ def verify_vsmeta(data: bytes, metadata: dict, season=None, episode=None):
         issues.append("缺少标题字段")
 
     # 年份校验
-    if metadata.get('year') and metadata['year'] != '1900':
+    if metadata.get("year") and metadata["year"] != "1900":
         try:
-            expected = int(metadata['year'])
+            expected = int(metadata["year"])
         except (ValueError, TypeError):
             issues.append(f"年份格式异常: {metadata['year']!r}")
         else:
@@ -436,9 +455,9 @@ def verify_vsmeta(data: bytes, metadata: dict, season=None, episode=None):
                 issues.append(f"年份不符: 期望 {expected}")
 
     # 评分校验
-    if metadata.get('rate'):
+    if metadata.get("rate"):
         try:
-            expected = int(float(metadata['rate']) * 10)
+            expected = int(float(metadata["rate"]) * 10)
             if TAG_RATING not in tag_values or tag_values[TAG_RATING][0] != expected:
                 issues.append(f"评分不符: 期望 {expected}")
         except ValueError:
@@ -481,7 +500,7 @@ def parse_vsmeta_fields(data):
             fields.setdefault(tag, []).append(val)
         elif tag in GROUP_TAGS:
             length, pos = read_varint(data, pos)
-            sub = data[pos:pos + length]
+            sub = data[pos : pos + length]
             pos += length
             fields.setdefault(tag, []).append(sub)
         else:
@@ -496,7 +515,7 @@ def write_byte(ba: bytearray, t: int):
 
 
 def write_string(ba: bytearray, string: str):
-    byte = string.encode('utf-8')
+    byte = string.encode("utf-8")
     length = len(byte)
     write_int(ba, length)
     ba.extend(byte)
@@ -524,7 +543,7 @@ def read_varint(data: bytes, pos: int):
         shift += 7
 
 
-def get_node(doc: xmldom.Document, tag: str, default: str = '') -> str:
+def get_node(doc: Union[xmldom.Document, xmldom.Element], tag: str, default: str = "") -> str:
     """提取节点文本，拼接所有文本/CDATA 子节点（兼容混合内容）"""
     nd = doc.getElementsByTagName(tag)
     if len(nd) == 0:
@@ -534,11 +553,13 @@ def get_node(doc: xmldom.Document, tag: str, default: str = '') -> str:
     for child in node.childNodes:
         if child.nodeType in (xmldom.Node.TEXT_NODE, xmldom.Node.CDATA_SECTION_NODE):
             parts.append(child.nodeValue)
-    text = ''.join(parts).strip()
+    text = "".join(parts).strip()
     return text if text else default
 
 
-def get_node_list(doc: xmldom.Document, tag: str, child_tag: str = '', default=None) -> list:
+def get_node_list(
+    doc: Union[xmldom.Document, xmldom.Element], tag: str, child_tag: str = "", default=None
+) -> list:
     if default is None:
         default = []
     nds = doc.getElementsByTagName(tag)
@@ -551,11 +572,11 @@ def get_node_list(doc: xmldom.Document, tag: str, child_tag: str = '', default=N
             for child in nd.childNodes:
                 if child.nodeType in (xmldom.Node.TEXT_NODE, xmldom.Node.CDATA_SECTION_NODE):
                     parts.append(child.nodeValue)
-            text = ''.join(parts).strip()
+            text = "".join(parts).strip()
             if text:
                 result.append(text)
         return result
-    return [get_node(nd, child_tag, '') for nd in nds if get_node(nd, child_tag, '')]
+    return [get_node(nd, child_tag, "") for nd in nds if get_node(nd, child_tag, "")]
 
 
 def to_base64(pic_path: str, config: dict) -> str:
@@ -563,16 +584,16 @@ def to_base64(pic_path: str, config: dict) -> str:
     with open(pic_path, "rb") as p:
         pic_bytes = p.read()
 
-    if config.get('compress_image', True) and HAS_PIL:
+    if config.get("compress_image", True) and HAS_PIL:
         try:
-            pic_bytes = compress_pic(pic_bytes, int(config.get('compress_kb', 200)))
+            pic_bytes = compress_pic(pic_bytes, int(config.get("compress_kb", 200)))
         except Exception as e:
             logging.warning(f"图片压缩失败，使用原图: {pic_path} ({e})")
 
-    pic_base64 = base64.b64encode(pic_bytes).decode('utf-8')
+    pic_base64 = base64.b64encode(pic_bytes).decode("utf-8")
     splitleng = 76
-    pic_list = [pic_base64[i:i + splitleng] for i in range(0, len(pic_base64), splitleng)]
-    return '\n'.join(pic_list)
+    pic_list = [pic_base64[i : i + splitleng] for i in range(0, len(pic_base64), splitleng)]
+    return "\n".join(pic_list)
 
 
 def compress_pic(bytes_data: bytes, kb: int = 200, k: float = 0.8) -> bytes:
@@ -580,13 +601,15 @@ def compress_pic(bytes_data: bytes, kb: int = 200, k: float = 0.8) -> bytes:
     if len(bytes_data) // 1024 <= kb:
         return bytes_data
 
-    img = Image.open(io.BytesIO(bytes_data))
+    img: "Image.Image" = Image.open(io.BytesIO(bytes_data))
     try:
+        # Resampling 枚举自 Pillow 9.1 引入，旧版本用模块级常量 LANCZOS
+        resample = getattr(Image, "Resampling", Image).LANCZOS
         while len(bytes_data) // 1024 > kb:
             x, y = img.size
-            img = img.resize((max(1, int(x * k)), max(1, int(y * k))), Image.LANCZOS)
+            img = img.resize((max(1, int(x * k)), max(1, int(y * k))), resample)
             out = io.BytesIO()
-            img.save(out, 'jpeg')
+            img.save(out, "jpeg")
             bytes_data = out.getvalue()
         return bytes_data
     finally:
@@ -599,29 +622,33 @@ def to_md5(content: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="nfo 转 vsmeta（统一版）")
-    parser.add_argument('--version', action='version', version=f"nfo-to-vsmeta {__version__}")
-    parser.add_argument('--config', type=str, default="config.json", help="指定配置文件路径")
-    parser.add_argument('--log-file', type=str, default=None, help="指定日志文件路径（覆盖配置文件）")
-    parser.add_argument('--directory', type=str, default=None, help="指定扫描目录（覆盖配置文件）")
-    parser.add_argument('--poster', type=str, default=None, help="海报文件后缀（覆盖配置文件）")
-    parser.add_argument('--fanart', type=str, default=None, help="背景文件后缀（覆盖配置文件）")
-    parser.add_argument('--dry-run', action='store_true', help="干跑模式：只打印将转换的文件，不写盘")
-    parser.add_argument('--verify', action='store_true', help="转换后回读自检 vsmeta 字段完整性")
+    parser.add_argument("--version", action="version", version=f"nfo-to-vsmeta {__version__}")
+    parser.add_argument("--config", type=str, default="config.json", help="指定配置文件路径")
+    parser.add_argument(
+        "--log-file", type=str, default=None, help="指定日志文件路径（覆盖配置文件）"
+    )
+    parser.add_argument("--directory", type=str, default=None, help="指定扫描目录（覆盖配置文件）")
+    parser.add_argument("--poster", type=str, default=None, help="海报文件后缀（覆盖配置文件）")
+    parser.add_argument("--fanart", type=str, default=None, help="背景文件后缀（覆盖配置文件）")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="干跑模式：只打印将转换的文件，不写盘"
+    )
+    parser.add_argument("--verify", action="store_true", help="转换后回读自检 vsmeta 字段完整性")
     args = parser.parse_args()
 
     try:
         config = load_config(args.config)
         setup_logging(
-            args.log_file or config.get('log_file', 'process.log'),
-            int(config.get('log_max_bytes', 1048576)),
-            int(config.get('log_backup_count', 3)),
+            args.log_file or config.get("log_file", "process.log"),
+            int(config.get("log_max_bytes", 1048576)),
+            int(config.get("log_backup_count", 3)),
         )
         if args.directory:
-            config['directory'] = args.directory
+            config["directory"] = args.directory
         if args.poster:
-            config['poster_suffix'] = args.poster
+            config["poster_suffix"] = args.poster
         if args.fanart:
-            config['fanart_suffix'] = args.fanart
+            config["fanart_suffix"] = args.fanart
 
         logging.info("加载配置成功")
         if args.dry_run:
@@ -636,5 +663,5 @@ def main():
         logging.error(f"程序运行出错: {e}", exc_info=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

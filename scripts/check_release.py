@@ -30,10 +30,10 @@ import subprocess
 # 允许的变更分类（与 CHANGELOG.md 模板保持一致）
 ALLOWED_SECTIONS = {"新增", "修复", "改进", "废弃", "移除", "安全"}
 
-SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
-VERSION_ENTRY_RE = re.compile(r'^## \[(\d+\.\d+\.\d+)\]')
-UNRELEASED_RE = re.compile(r'^## \[Unreleased\]', re.MULTILINE)
-SECTION_RE = re.compile(r'^### (.+)$')
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+VERSION_ENTRY_RE = re.compile(r"^## \[(\d+\.\d+\.\d+)\]")
+UNRELEASED_RE = re.compile(r"^## \[Unreleased\]", re.MULTILINE)
+SECTION_RE = re.compile(r"^### (.+)$")
 
 
 def fail(checks, msg):
@@ -102,7 +102,10 @@ def check_changelog(repo_root, version, checks):
 
     bad = [s for s in sections_found if s not in ALLOWED_SECTIONS]
     if bad:
-        fail(checks, f"最新版本条目含未允许的分类：{', '.join(bad)}（允许：{'/'.join(sorted(ALLOWED_SECTIONS))}）")
+        fail(
+            checks,
+            f"最新版本条目含未允许的分类：{', '.join(bad)}（允许：{'/'.join(sorted(ALLOWED_SECTIONS))}）",
+        )
     elif not sections_found:
         fail(checks, "最新版本条目下没有任何变更分类")
     else:
@@ -120,7 +123,10 @@ def run_tests(repo_root, checks):
     try:
         result = subprocess.run(
             [sys.executable, "-m", "unittest", "discover", "-s", "tests"],
-            cwd=repo_root, capture_output=True, text=True, timeout=300,
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=300,
         )
     except subprocess.TimeoutExpired:
         fail(checks, "单元测试超时（>300s）")
@@ -136,7 +142,10 @@ def check_tag(version, checks):
     tag = f"v{version}"
     try:
         result = subprocess.run(
-            ["git", "tag", "-l", tag], capture_output=True, text=True, timeout=30,
+            ["git", "tag", "-l", tag],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except Exception as e:
         fail(checks, f"无法查询 git tag：{e}")
@@ -149,8 +158,11 @@ def check_tag(version, checks):
 
 def main():
     parser = argparse.ArgumentParser(description="发布前自动验证：版本号与 CHANGELOG 一致性")
-    parser.add_argument("--repo-root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        help="仓库根目录（默认自动探测）")
+    parser.add_argument(
+        "--repo-root",
+        default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        help="仓库根目录（默认自动探测）",
+    )
     parser.add_argument("--run-tests", action="store_true", help="同时运行单元测试")
     parser.add_argument("--check-tag", action="store_true", help="同时校验 git tag vX.Y.Z 已存在")
     args = parser.parse_args()
