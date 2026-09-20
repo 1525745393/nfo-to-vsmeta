@@ -1,7 +1,11 @@
 {
-    "directory": "./videos",               // 需要扫描的目录
-    "poster_suffix": "-poster.jpg",        // 海报文件的后缀
-    "fanart_suffix": "-fanart.jpg",        // 背景文件的后缀
-    "video_extensions": [".mp4", ".mkv"], // 支持的视频文件扩展名
-    "delete_vsmeta": false                 // 是否删除已有的 vsmeta 文件
+    "directory": "./videos",
+    "poster_suffix": "-poster.jpg",
+    "fanart_suffix": "-fanart.jpg",
+    "video_extensions": [".mkv", ".mp4", ".rmvb", ".avi", ".wmv", ".ts"],
+    "delete_vsmeta": false,
+    "max_workers": 4,
+    "compress_image": true,
+    "compress_kb": 200,
+    "log_file": "process.log"
 }
