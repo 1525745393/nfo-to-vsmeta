@@ -1,0 +1,46 @@
+# 自动发布：打 v* 标签即触发构建并创建 GitHub Release
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # 创建 Release 需要写权限
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 拉取全部历史与 tags（发布校验依赖 git tag 查询）
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 发布前验证（版本号/CHANGELOG/单元测试/git tag）
+        run: python scripts/check_release.py --run-tests --check-tag
+
+      - name: 构建发布包
+        run: python scripts/build_release.py
+
+      - name: 读取版本号
+        id: version
+        run: echo "version=$(python -c 'from version import __version__; print(__version__)')" >> "$GITHUB_OUTPUT"
+
+      - name: 生成 Release notes
+        id: notes
+        run: python scripts/build_release.py --notes > notes.md
+
+      - name: 创建 GitHub Release 并上传附件
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            "dist/nfo-to-vsmeta-${{ steps.version.outputs.version }}.zip" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes-file notes.md

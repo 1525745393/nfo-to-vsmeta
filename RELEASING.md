@@ -71,10 +71,16 @@ git push origin main --tags
 
 > tag 名称必须是 `v` + 版本号（如 `v1.2.0`），`check_release.py --check-tag` 依赖此约定。
 
-### 9. 发布后确认
+### 9. 发布后确认（自动发布）
 
-- [ ] GitHub Actions 全部通过（包含 release check 步骤）
-- [ ] 如需在 GitHub 创建 Release 说明，可直接粘贴 CHANGELOG 对应版本条目
+推送 `v*` 标签后，GitHub Actions `release` 工作流自动执行：
+
+1. 发布前验证（版本号/CHANGELOG/单元测试/git tag）；
+2. `scripts/build_release.py` 构建 `dist/nfo-to-vsmeta-<版本>.zip`；
+3. 创建 GitHub Release，附上发布包，notes 自动取自 CHANGELOG 对应版本条目。
+
+- [ ] 确认 release 工作流运行成功，Release 页面出现发布包附件
+- [ ] CI（test.yml）在 main 上的最近一次运行全部通过
 
 ## 快速发布（无新功能时）
 

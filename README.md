@@ -1,5 +1,7 @@
 # nfo to vsmeta
 
+[![CI](https://github.com/1525745393/nfo-to-vsmeta/actions/workflows/test.yml/badge.svg)](https://github.com/1525745393/nfo-to-vsmeta/actions/workflows/test.yml)
+
 通过 Emby/Jellyfin/TinyMediaManager 等刮削到的 nfo 元数据，转换成群晖 Video Station 专用 vsmeta 元数据，实现刮削数据共享复用。
 
 > 感谢原版大佬建议，更改代码自用版。
@@ -15,8 +17,22 @@
 | `CHANGELOG.md` | 版本变更记录（Keep a Changelog 标准） |
 | `RELEASING.md` | 版本更新检查清单 |
 | `scripts/check_release.py` | 发布前自动验证（版本号/CHANGELOG 一致性 + 可选测试与 git tag） |
+| `scripts/build_release.py` | 构建发布 zip（`dist/nfo-to-vsmeta-<版本>.zip`），供自动发布上传 |
 | `tests/` | 单元测试（`python3 -m unittest discover -s tests`） |
-| `.github/workflows/test.yml` | GitHub Actions 自动测试 + 发布校验（Python 3.8–3.12） |
+| `.github/workflows/test.yml` | CI：Linter（ruff）+ 类型检查（mypy）+ 测试矩阵（Python 3.8–3.12）+ 发布校验 |
+| `.github/workflows/release.yml` | 自动发布：推送 `v*` 标签即构建发布包并创建 GitHub Release |
+
+## 发布方式（维护者）
+
+代码推送到 `main` 会自动触发 CI（Lint/类型检查/测试）。需要发版时：
+
+```bash
+python3 scripts/check_release.py --run-tests --check-tag   # 本地门禁，全部 [ok]
+git add -A && git commit -m "release: vX.Y.Z ..."
+git tag vX.Y.Z && git push origin main --tags              # 推送标签即触发自动发布
+```
+
+打标签推送后，GitHub Actions 会自动：验证 → 打包 `nfo-to-vsmeta-vX.Y.Z.zip` → 创建 Release（notes 取自 CHANGELOG）。详细流程见 [RELEASING.md](RELEASING.md)。
 
 ## 使用方法
 
