@@ -8,24 +8,36 @@ on:
 permissions:
   contents: read
 
+# 同一分支/PR 的新提交自动取消旧运行，节省 Actions 时间
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip" # pip 下载缓存
       - name: Install dev tools
         run: pip install ruff mypy
+      - name: Cache ruff & mypy
+        uses: actions/cache@v4
+        with:
+          path: |
+            .ruff_cache
+            .mypy_cache
+          key: ${{ runner.os }}-lint-${{ hashFiles('pyproject.toml', 'nfo-to-vsmeta.1.0.py', 'version.py', 'scripts/check_release.py', 'scripts/build_release.py', 'scripts/release.py', 'tests/*.py') }}
       - name: Ruff lint
-        run: ruff check .
+        run: ruff check . --cache-dir .ruff_cache
       - name: Ruff format check
         run: ruff format --check .
       - name: Mypy type check
-        run: mypy
+        run: mypy --cache-dir .mypy_cache
 
   test:
     name: Test on Python ${{ matrix.python-version }}
@@ -36,11 +48,23 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
-      - name: Release pre-check
+      - name: Smoke test (--version 与 CLI)
+        run: |
+          python nfo-to-vsmeta.1.0.py --version
+          python nfo-to-vsmeta.1.0.py --dry-run --directory /nonexistent 2>&1 | tail -1
+
+  release-check:
+    name: Release Pre-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 发布前验证（版本号/CHANGELOG/单元测试）
         run: python scripts/check_release.py --run-tests

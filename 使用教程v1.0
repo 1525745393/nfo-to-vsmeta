@@ -58,11 +58,13 @@ Python 3.8 或更高版本
 - --dry-run: 干跑模式，只打印将转换的文件，不写盘。
 - --verify: 转换后回读 vsmeta 自检（校验年份、评分、季/集等字段），结果写入日志。
 - --log-file FILE: 指定日志文件路径，覆盖配置文件。
+- --check-update: 检查 GitHub 是否有新版本并提示。联网失败时静默忽略，不影响转换。
 
 常用示例：
 - 常规转换并自检：python3 nfo-to-vsmeta.1.0.py --config config.json --verify
 - 先干跑确认范围：python3 nfo-to-vsmeta.1.0.py --config config.json --dry-run
 - 直接指定目录（不依赖配置）：python3 nfo-to-vsmeta.1.0.py --directory /volume1/video/Links/Movie/
+- 检查是否有新版本：python3 nfo-to-vsmeta.1.0.py --check-update
 
 4. 剧集支持
 脚本会自动从文件名解析季/集号并写入 vsmeta：
@@ -142,4 +144,11 @@ Python 3.8 或更高版本
 发布新版本前自动验证（版本号与 CHANGELOG 一致性、格式合规）：
     python3 scripts/check_release.py --run-tests --check-tag
 
-版本更新完整流程见仓库 RELEASING.md。
+一键发布（维护者）：把变更写入 CHANGELOG [Unreleased] 后执行
+    python3 scripts/release.py --bump minor
+然后推送：git push origin main --tags（推送 v* 标签自动触发 GitHub Actions 打包与 Release）。
+
+转换性能基准（跨版本对比时固定参数）：
+    python3 scripts/benchmark.py --files 200 --workers 4
+
+版本更新完整流程（含预发布、回滚方案）见仓库 RELEASING.md。

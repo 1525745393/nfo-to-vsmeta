@@ -21,5 +21,8 @@ files = [
     "version.py",
     "scripts/check_release.py",
     "scripts/build_release.py",
+    "scripts/release.py",
+    "scripts/benchmark.py",
     "tests/test_nfo2vsmeta.py",
+    "tests/test_release_tools.py",
 ]

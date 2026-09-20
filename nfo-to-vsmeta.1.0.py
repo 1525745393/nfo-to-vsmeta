@@ -620,6 +620,37 @@ def to_md5(content: str) -> str:
     return hashlib.md5(content.encode("utf-8")).hexdigest()
 
 
+def format_update_message(latest: str, current: str) -> str:
+    """根据最新版本号生成升级提示；无需提示时返回空字符串"""
+    latest = latest.lstrip("v").strip()
+    if not latest or current in ("unknown", latest):
+        return ""
+    return (
+        f"发现新版本 v{latest}（当前 v{current}）。"
+        f"查看 https://github.com/1525745393/nfo-to-vsmeta/releases"
+    )
+
+
+def check_update():
+    """查询 GitHub Releases 最新版本并提示（联网失败静默，不影响正常使用）"""
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/1525745393/nfo-to-vsmeta/releases/latest",
+            headers={"User-Agent": "nfo-to-vsmeta", "Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.load(resp)
+        msg = format_update_message(data.get("tag_name", ""), __version__)
+        if msg:
+            logging.info(msg)
+        elif __version__ != "unknown":
+            logging.info(f"已是最新版本 v{__version__}")
+    except Exception as e:
+        logging.info(f"检查更新失败（忽略）: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="nfo 转 vsmeta（统一版）")
     parser.add_argument("--version", action="version", version=f"nfo-to-vsmeta {__version__}")
@@ -634,6 +665,11 @@ def main():
         "--dry-run", action="store_true", help="干跑模式：只打印将转换的文件，不写盘"
     )
     parser.add_argument("--verify", action="store_true", help="转换后回读自检 vsmeta 字段完整性")
+    parser.add_argument(
+        "--check-update",
+        action="store_true",
+        help="检查 GitHub 是否有新版本（联网失败静默，不影响转换）",
+    )
     args = parser.parse_args()
 
     try:
@@ -643,6 +679,8 @@ def main():
             int(config.get("log_max_bytes", 1048576)),
             int(config.get("log_backup_count", 3)),
         )
+        if args.check_update:
+            check_update()
         if args.directory:
             config["directory"] = args.directory
         if args.poster:
