@@ -18,21 +18,22 @@
 | `RELEASING.md` | 版本更新检查清单 |
 | `scripts/check_release.py` | 发布前自动验证（版本号/CHANGELOG 一致性 + 可选测试与 git tag） |
 | `scripts/build_release.py` | 构建发布 zip（`dist/nfo-to-vsmeta-<版本>.zip`），供自动发布上传 |
+| `scripts/release.py` | 一键发布：`--bump minor` 完成 版本号→CHANGELOG→验证→提交→tag |
+| `scripts/benchmark.py` | 转换性能基准（合成数据测吞吐，供跨版本对比） |
 | `tests/` | 单元测试（`python3 -m unittest discover -s tests`） |
 | `.github/workflows/test.yml` | CI：Linter（ruff）+ 类型检查（mypy）+ 测试矩阵（Python 3.8–3.12）+ 发布校验 |
-| `.github/workflows/release.yml` | 自动发布：推送 `v*` 标签即构建发布包并创建 GitHub Release |
+| `.github/workflows/release.yml` | 自动发布：推送 `v*` 标签即构建发布包并创建 GitHub Release（含 SHA256 校验与预发布支持） |
 
 ## 发布方式（维护者）
 
 代码推送到 `main` 会自动触发 CI（Lint/类型检查/测试）。需要发版时：
 
 ```bash
-python3 scripts/check_release.py --run-tests --check-tag   # 本地门禁，全部 [ok]
-git add -A && git commit -m "release: vX.Y.Z ..."
-git tag vX.Y.Z && git push origin main --tags              # 推送标签即触发自动发布
+python3 scripts/release.py --bump minor        # 一键：bump → CHANGELOG → 验证 → 提交 → 打 tag
+git push origin main --tags                    # 推送标签即触发自动发布
 ```
 
-打标签推送后，GitHub Actions 会自动：验证 → 打包 `nfo-to-vsmeta-vX.Y.Z.zip` → 创建 Release（notes 取自 CHANGELOG）。详细流程见 [RELEASING.md](RELEASING.md)。
+打标签推送后，GitHub Actions 会自动：验证 → 打包 `nfo-to-vsmeta-vX.Y.Z.zip` + `SHA256SUMS` → 解压自检 → 创建 Release（notes 取自 CHANGELOG）。预发布用 `vX.Y.Z-rcN` 标签（自动标记 Prerelease）。详细流程见 [RELEASING.md](RELEASING.md)。
 
 ## 使用方法
 
@@ -59,6 +60,7 @@ git tag vX.Y.Z && git push origin main --tags              # 推送标签即触�
 | `--verify` | 转换后回读 vsmeta 自检字段完整性，结果写入日志 |
 | `--log-file FILE` | 指定日志文件路径，覆盖配置 |
 | `--version` | 输出版本号（读取 version.py） |
+| `--check-update` | 检查 GitHub 是否有新版本并提示（联网失败静默，不影响转换） |
 
 ## 功能特性
 

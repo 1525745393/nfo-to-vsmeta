@@ -19,9 +19,19 @@
 
 ### 新增
 
+- 一键发布脚本 `scripts/release.py`：`--bump patch|minor|major` 一条命令完成 版本号递增 → CHANGELOG 搬运 → 发布前验证 → 提交 → 打 tag；
+- 性能基准工具 `scripts/benchmark.py`：合成数据测量 nfo→vsmeta 转换吞吐，供跨版本对比；
+- 主脚本新增 `--check-update`：查询 GitHub Releases 提示新版本（联网失败静默，不影响转换）；
+- 发布包安全增强：Release 附件增加 SHA256SUMS 校验和，工作流自动验证发布包解压后 `--version` 一致；
+- 预发布支持：`vX.Y.Z-rcN` 标签自动标记为 Prerelease，可先发布到测试环境验证。
+
 ### 修复
 
 ### 改进
+
+- CI 提速：pip / ruff / mypy 缓存、同分支新提交自动取消旧运行、发布校验从测试矩阵中抽出独立执行一次；
+- CI 新增 smoke 测试（`--version` 与 CLI 冒烟），测试矩阵保持 Python 3.8–3.12；
+- `check_release.py --check-tag` 兼容预发布 tag（`v1.3.0-rc1` 也视为已打 tag）。
 
 ### 废弃
 

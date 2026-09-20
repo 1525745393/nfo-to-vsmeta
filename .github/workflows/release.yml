@@ -1,4 +1,6 @@
 # 自动发布：打 v* 标签即触发构建并创建 GitHub Release
+# - 正式版本 vX.Y.Z：发布稳定版
+# - 预发布版本 vX.Y.Z-rcN（含连字符的 tag）：标记为 Prerelease，用于测试环境
 name: release
 
 on:
@@ -21,6 +23,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: 发布前验证（版本号/CHANGELOG/单元测试/git tag）
         run: python scripts/check_release.py --run-tests --check-tag
@@ -32,15 +35,40 @@ jobs:
         id: version
         run: echo "version=$(python -c 'from version import __version__; print(__version__)')" >> "$GITHUB_OUTPUT"
 
-      - name: 生成 Release notes
-        id: notes
-        run: python scripts/build_release.py --notes > notes.md
+      - name: 生成 SHA256 校验和
+        run: |
+          cd dist
+          sha256sum nfo-to-vsmeta-*.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: 验证发布包可运行（解压 + --version 一致性）
+        run: |
+          mkdir -p verify && cd verify
+          unzip -q ../dist/nfo-to-vsmeta-${{ steps.version.outputs.version }}.zip
+          cd nfo-to-vsmeta-${{ steps.version.outputs.version }}
+          v="$(python nfo-to-vsmeta.1.0.py --version)"
+          echo "包内版本输出: $v"
+          test "$v" = "nfo-to-vsmeta ${{ steps.version.outputs.version }}"
+
+      - name: 生成 Release notes（含校验和）
+        run: |
+          python scripts/build_release.py --notes > notes.md
+          printf '\n---\n### 校验和（SHA256）\n\n```\n' >> notes.md
+          cat dist/SHA256SUMS >> notes.md
+          printf '```\n' >> notes.md
 
       - name: 创建 GitHub Release 并上传附件
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
+          PRERELEASE=""
+          # 预发布 tag（如 v1.3.0-rc1）标记为 Prerelease
+          if [[ "${{ github.ref_name }}" == *-* ]]; then
+            PRERELEASE="--prerelease"
+          fi
+          gh release create "${{ github.ref_name }}" \
             "dist/nfo-to-vsmeta-${{ steps.version.outputs.version }}.zip" \
-            --title "v${{ steps.version.outputs.version }}" \
-            --notes-file notes.md
+            dist/SHA256SUMS \
+            --title "${{ github.ref_name }}" \
+            --notes-file notes.md \
+            $PRERELEASE
