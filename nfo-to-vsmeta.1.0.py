@@ -51,7 +51,8 @@ DEFAULT_CONFIG = {
     "log_file": "process.log",               # 日志文件路径
     "log_max_bytes": 1048576,                # 日志文件最大字节数（默认 1MB），超过后轮转
     "log_backup_count": 3,                   # 日志轮转保留的备份份数
-    "studio_as_tagline": False               # vsmeta 无独立 studio 字段，True 时把制片厂合并进 tagline
+    "studio_as_tagline": False,              # vsmeta 无独立 studio 字段，True 时把制片厂合并进 tagline
+    "parse_episode_from_trailing_digits": False  # 是否从结尾2位数字解析集号（如 Show.02）；JAV 番号类命名请保持关闭
 }
 
 # vsmeta 二进制 tag 定义（参考 VideoStation VsMeta File Format）
@@ -210,7 +211,8 @@ def process_single_file(root: str, filename: str, config: dict, dry_run: bool = 
             return "success"
 
         metadata = parse_nfo(nfo_path)
-        season, episode = parse_season_episode(filename)
+        season, episode = parse_season_episode(
+            filename, config.get('parse_episode_from_trailing_digits', False))
         buf = build_vsmeta_content(metadata, poster_path, fanart_path, config, season, episode)
 
         with open(vsmeta_path, 'wb') as op:
@@ -266,8 +268,9 @@ def parse_nfo(nfo_path: str) -> dict:
     }
 
 
-def parse_season_episode(filename: str):
-    """从文件名解析剧集季/集号，支持 S01E02 / 1x2 / 结尾2-3位数字；无法识别返回 (None, None)"""
+def parse_season_episode(filename: str, enable_trailing_digits: bool = False):
+    """从文件名解析剧集季/集号，支持 S01E02 / 1x2 / 结尾2位数字（需 enable_trailing_digits）；
+    无法识别返回 (None, None)"""
     base = os.path.splitext(os.path.basename(filename))[0]
 
     m = re.search(r'[Ss](\d{1,2})[Ee](\d{1,3})', base)
@@ -278,10 +281,13 @@ def parse_season_episode(filename: str):
     if m:
         return int(m.group(1)), int(m.group(2))
 
-    # 结尾 2-3 位数字（如 xxx.02 / xxx - 12），视为第 1 季的集号
-    m = re.search(r'[ _\-.]\d{2,3}$', base)
-    if m:
-        return 1, int(m.group(0).strip(' _-.'))
+    # 结尾 2 位数字（如 xxx.02 / xxx - 12），视为第 1 季的集号。
+    # 默认关闭：JAV 番号（如 ABP-998、STARS-061）与少数电影名会误判为剧集，
+    # 仅当配置 parse_episode_from_trailing_digits=true 时启用。
+    if enable_trailing_digits:
+        m = re.search(r'[ _\-.]\d{2}$', base)
+        if m:
+            return 1, int(m.group(0).strip(' _-.'))
 
     return None, None
 
@@ -423,9 +429,13 @@ def verify_vsmeta(data: bytes, metadata: dict, season=None, episode=None):
 
     # 年份校验
     if metadata.get('year') and metadata['year'] != '1900':
-        expected = int(metadata['year'])
-        if TAG_YEAR not in tag_values or tag_values[TAG_YEAR][0] != expected:
-            issues.append(f"年份不符: 期望 {expected}")
+        try:
+            expected = int(metadata['year'])
+        except (ValueError, TypeError):
+            issues.append(f"年份格式异常: {metadata['year']!r}")
+        else:
+            if TAG_YEAR not in tag_values or tag_values[TAG_YEAR][0] != expected:
+                issues.append(f"年份不符: 期望 {expected}")
 
     # 评分校验
     if metadata.get('rate'):

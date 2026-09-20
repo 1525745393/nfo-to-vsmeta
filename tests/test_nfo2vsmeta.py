@@ -75,8 +75,20 @@ class SeasonEpisodeTestCase(unittest.TestCase):
         self.assertEqual(n2v.parse_season_episode("Show 3x05.avi"), (3, 5))
 
     def test_trailing_digits(self):
-        self.assertEqual(n2v.parse_season_episode("Show.02.mkv"), (1, 2))
-        self.assertEqual(n2v.parse_season_episode("Show - 12.ts"), (1, 12))
+        # 尾数字解析默认关闭（避免 JAV 番号等误判），开启后仅接受两位数字
+        self.assertEqual(n2v.parse_season_episode("Show.02.mkv"), (None, None))
+        self.assertEqual(n2v.parse_season_episode("Show - 12.ts"), (None, None))
+        self.assertEqual(n2v.parse_season_episode("Show.02.mkv", True), (1, 2))
+        self.assertEqual(n2v.parse_season_episode("Show - 12.ts", True), (1, 12))
+
+    def test_jav_fanhao_not_misparsed(self):
+        # JAV 番号：默认与开启尾数字后均不应误判为剧集（3 位数字被收紧规则排除）
+        for name in ["ABP-998.mkv", "STARS-061.mkv", "MIDV-904.mp4"]:
+            self.assertEqual(n2v.parse_season_episode(name), (None, None), name)
+            self.assertEqual(n2v.parse_season_episode(name, True), (None, None), name)
+        # 电影年份/名称不应误判
+        self.assertEqual(n2v.parse_season_episode("Movie.2020.mkv", True), (None, None))
+        self.assertEqual(n2v.parse_season_episode("The.300.mkv", True), (None, None))
 
     def test_no_match(self):
         self.assertIsNone(n2v.parse_season_episode("Movie (2020).mkv")[0])
@@ -228,6 +240,19 @@ class VerifyTestCase(unittest.TestCase):
         ok, issues = n2v.verify_vsmeta(data, bad_meta)
         self.assertFalse(ok)
         self.assertTrue(any('年份不符' in i for i in issues))
+
+    def test_verify_non_numeric_year(self):
+        # 非数字年份不应抛异常，而是返回明确的 issue
+        meta = {
+            'title': '电影', 'sorttitle': '', 'tagline': '', 'plot': '简介', 'year': '2000',
+            'level': 'G', 'date': '2000-01-01', 'rate': '8.0', 'genre': [], 'actors': [],
+            'directors': [], 'writers': [], 'studio': [],
+        }
+        cfg = {'compress_image': False, 'compress_kb': 200, 'studio_as_tagline': False}
+        data = bytes(n2v.build_vsmeta_content(meta, '/nonexist.jpg', '/nonexist.jpg', cfg))
+        ok, issues = n2v.verify_vsmeta(data, dict(meta, year='2020-05-01'))
+        self.assertFalse(ok)
+        self.assertTrue(any('年份格式异常' in i for i in issues))
 
 
 class DryRunTestCase(unittest.TestCase):

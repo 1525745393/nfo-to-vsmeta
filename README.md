@@ -41,7 +41,7 @@
 
 ## 功能特性
 
-- **电影 + 剧集**：自动从文件名解析季/集号（`S01E02` / `1x2` / 结尾 2-3 位数字），剧集写入 season/episode 字段；
+- **电影 + 剧集**：自动从文件名解析季/集号（`S01E02` / `1x2`），剧集写入 season/episode 字段；结尾数字（如 `Show.02`）需配置 `parse_episode_from_trailing_digits: true` 才启用（默认关闭，避免 JAV 番号等误判为剧集）；
 - **完整元数据**：标题、副标题、标语、简介、年份、日期、分级、评分、类型、演员、导演、编剧；
 - **图片压缩**：已安装 Pillow 时自动把海报/背景图压缩至 `compress_kb`（默认 200KB）以内；
 - **多目录**：`directory` 可填列表一次处理多个路径；
@@ -66,7 +66,7 @@
 
 **新增**
 
-- TV 剧集支持：从文件名解析 `SxxEyy` / `xx x yy` / 结尾集号，写入 vsmeta 的 season/episode 字段；
+- TV 剧集支持：从文件名解析 `SxxEyy` / `xx x yy`，写入 vsmeta 的 season/episode 字段；
 - `--dry-run` 干跑模式：只打印将转换的文件，不写盘；
 - `--verify` 自检模式：转换后回读解析 vsmeta，校验年份/评分/季集等关键字段并写入日志；
 - 日志轮转（`log_max_bytes` / `log_backup_count` 配置）；
@@ -74,10 +74,15 @@
 - 提取 studio（制片厂）字段，`studio_as_tagline: true` 时合并进 tagline（vsmeta 格式无独立 studio 字段）；
 - 未识别文件提示（`ignore_extensions` 可配置忽略列表）。
 
+**修复**
+
+- 结尾数字解析（`Show.02`）改为配置开关 `parse_episode_from_trailing_digits`（默认关闭），并收紧为两位数字——修复 JAV 番号（如 `ABP-998`）与少数电影名被误判为剧集的问题；
+- `--verify` 对非数字年份不再抛异常，改为记录"年份格式异常"问题。
+
 **重构**
 
 - 合并原 transfer.py，统一为一个脚本，消除重复代码；
-- 新增单元测试套件（varint 边界、季集解析、编码回退、字段完整性、dry-run、自检）与 GitHub Actions CI。
+- 新增单元测试套件（varint 边界、季集解析、编码回退、字段完整性、dry-run、自检、JAV 番号回归）与 GitHub Actions CI。
 
 ### v1.0.1（修复版）— 2025-05-06
 

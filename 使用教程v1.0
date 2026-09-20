@@ -28,7 +28,8 @@ Python 3.8 或更高版本
     "log_file": "process.log",
     "log_max_bytes": 1048576,
     "log_backup_count": 3,
-    "studio_as_tagline": false
+    "studio_as_tagline": false,
+    "parse_episode_from_trailing_digits": false
 }
 
 参数说明：
@@ -46,6 +47,8 @@ Python 3.8 或更高版本
 - log_max_bytes: 日志文件最大字节数，默认 1048576（1MB），超过后自动轮转。
 - log_backup_count: 日志轮转保留的备份份数，默认 3。
 - studio_as_tagline: vsmeta 格式没有独立的制片厂（studio）字段，设为 true 时把制片厂合并进 tagline（标语）显示。
+- parse_episode_from_trailing_digits: 是否从文件名结尾的 2 位数字解析集号（如 Show.02 视为第 1 季第 2 集），默认 false。
+  保持关闭可避免 JAV 番号（如 ABP-998、STARS-061）和少数数字结尾的电影名被误判为剧集；仅当库里确有此类剧集命名时再开启。
 
 3. 命令行参数
     python3 nfo-to-vsmeta.1.0.py [选项]
@@ -65,9 +68,11 @@ Python 3.8 或更高版本
 脚本会自动从文件名解析季/集号并写入 vsmeta：
 - S01E02 / s01e02（季/集）
 - 1x2 / 3x05（季 x 集）
-- 结尾 2-3 位数字，如 xxx.02 / xxx - 12（视为第 1 季第 N 集）
+- 结尾 2 位数字，如 xxx.02 / xxx - 12（视为第 1 季第 N 集）——需将配置 parse_episode_from_trailing_digits 设为 true 才启用
 
 解析到季/集号时，vsmeta 会写入 season/episode 字段；电影文件名（如 Movie.2020）不受影响。
+注意：结尾数字解析默认关闭，且仅接受 2 位数字——JAV 番号（ABP-998、STARS-061 等 3 位数字）不会误判为剧集；
+若开启该开关，文件名形如"字母-两位数字"的 2 位番号（如 IPX-86）仍会被识别为剧集，请按库内命名自行权衡。
 剧集文件建议使用 SxxEyy 命名（NasTool 硬链输出默认即此格式）。
 
 5. 使用步骤

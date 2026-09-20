@@ -11,5 +11,6 @@
     "log_file": "process.log",
     "log_max_bytes": 1048576,
     "log_backup_count": 3,
-    "studio_as_tagline": false
+    "studio_as_tagline": false,
+    "parse_episode_from_trailing_digits": false
 }
