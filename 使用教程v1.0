@@ -20,8 +20,9 @@ Python 3.8 或更高版本
     "poster_suffix": "-poster.jpg",
     "fanart_suffix": "-fanart.jpg",
     "video_extensions": [".mkv", ".mp4", ".rmvb", ".avi", ".wmv", ".ts"],
-    "ignore_extensions": [".vsmeta", ".jpg", ".jpeg", ".nfo", ".srt", ".ass", ".ssa", ".png", ".db", ".log"],
+    "ignore_extensions": [".vsmeta", ".jpg", ".jpeg", ".nfo", ".srt", ".ass", ".ssa", ".png", ".db", ".log", ".tmp"],
     "delete_vsmeta": false,
+    "update_stale_vsmeta": true,
     "max_workers": 4,
     "compress_image": true,
     "compress_kb": 200,
@@ -40,6 +41,8 @@ Python 3.8 或更高版本
 - video_extensions: 支持的视频扩展名列表。示例值：[".mkv", ".mp4"]。
 - ignore_extensions: 扫描目录时忽略的文件扩展名，不认识的扩展名会打印"未识别文件"提示。
 - delete_vsmeta: 是否先删除已有的 .vsmeta 再重新转换。true 删除后重转，false 保留（已转换自动跳过）。
+- update_stale_vsmeta: 源文件（nfo/海报/背景）比 vsmeta 新时自动重新转换，默认 true——重新刮削后无需手动重置即可同步新元数据；
+  如不想让 vsmeta 被覆盖，可设为 false。
 - max_workers: 多线程并发数，默认 4。
 - compress_image: 是否压缩图片（需要安装 Pillow），默认 true。
 - compress_kb: 图片压缩目标大小（KB），默认 200。
@@ -56,19 +59,24 @@ Python 3.8 或更高版本
 - --config FILE: 指定配置文件路径，默认 config.json。
 - --directory DIR: 指定扫描目录，覆盖配置文件（也可用 --poster / --fanart 覆盖后缀）。
 - --dry-run: 干跑模式，只打印将转换的文件，不写盘。
-- --verify: 转换后回读 vsmeta 自检（校验年份、评分、季/集等字段），结果写入日志。
+- --verify: 转换后回读 vsmeta 自检（校验年份、日期、分级、评分、演员数量、季/集等字段），结果写入日志。
 - --log-file FILE: 指定日志文件路径，覆盖配置文件。
 - --check-update: 检查 GitHub 是否有新版本并提示。联网失败时静默忽略，不影响转换。
+- --quiet: 终端只显示警告与错误（日志仍完整写入文件），大批量运行时避免刷屏。
 
 常用示例：
 - 常规转换并自检：python3 nfo-to-vsmeta.1.0.py --config config.json --verify
 - 先干跑确认范围：python3 nfo-to-vsmeta.1.0.py --config config.json --dry-run
 - 直接指定目录（不依赖配置）：python3 nfo-to-vsmeta.1.0.py --directory /volume1/video/Links/Movie/
 - 检查是否有新版本：python3 nfo-to-vsmeta.1.0.py --check-update
+- 大批量静默运行：python3 nfo-to-vsmeta.1.0.py --config config.json --verify --quiet
+
+转换有失败时脚本退出码为 1（全部成功为 0），可被群晖任务计划等调用方感知。
 
 4. 剧集支持
 脚本会自动从文件名解析季/集号并写入 vsmeta：
 - S01E02 / s01e02（季/集）
+- S01E02E03 多集合辑（取第一集号，写为第 2 集）
 - 1x2 / 3x05（季 x 集）
 - 结尾 2 位数字，如 xxx.02 / xxx - 12（视为第 1 季第 N 集）——需将配置 parse_episode_from_trailing_digits 设为 true 才启用
 

@@ -3,6 +3,7 @@
 
 import os
 import sys
+import subprocess
 import tempfile
 import unittest
 import importlib.util
@@ -416,6 +417,216 @@ class EndToEndTestCase(unittest.TestCase):
             meta = n2v.parse_nfo(os.path.join(d, "Show.S02E03.nfo"))
             ok, issues = n2v.verify_vsmeta(data, meta, season=2, episode=3)
             self.assertTrue(ok, f"verify 应通过: {issues}")
+
+
+class SeasonEpisodeMultiTestCase(unittest.TestCase):
+    def test_sxxeyy_multi_takes_first(self):
+        # S01E02E03（合辑）取第一集
+        self.assertEqual(n2v.parse_season_episode("Show.S01E02E03.mkv"), (1, 2))
+
+    def test_sxxeyy_multi_triple(self):
+        self.assertEqual(n2v.parse_season_episode("Show.S02E05E06E07.mkv"), (2, 5))
+
+    def test_sxxeyy_single_unchanged(self):
+        self.assertEqual(n2v.parse_season_episode("Show.S01E02.mkv"), (1, 2))
+
+
+class ConfigValidationTestCase(unittest.TestCase):
+    def test_bad_directory_type(self):
+        with self.assertRaises(ValueError):
+            n2v.validate_config({"directory": 123})
+
+    def test_empty_directory_list(self):
+        with self.assertRaises(ValueError):
+            n2v.validate_config({"directory": []})
+
+    def test_bad_max_workers(self):
+        with self.assertRaises(ValueError):
+            n2v.validate_config({"directory": "./v", "max_workers": 0})
+
+    def test_bad_compress_kb(self):
+        with self.assertRaises(ValueError):
+            n2v.validate_config({"directory": "./v", "compress_kb": "big"})
+
+    def test_valid_config_passes(self):
+        n2v.validate_config(
+            {
+                "directory": "./v",
+                "poster_suffix": "-p.jpg",
+                "fanart_suffix": "-f.jpg",
+                "video_extensions": [".mkv"],
+                "max_workers": 2,
+                "compress_kb": 200,
+            }
+        )  # 不应抛异常
+
+
+class StaleVsmetaTestCase(unittest.TestCase):
+    def _make_env(self, d):
+        with open(os.path.join(d, "m.nfo"), "wb") as f:
+            f.write(make_nfo(title="电影", year="2020"))
+        with open(os.path.join(d, "m.mkv"), "wb") as f:
+            f.write(b"x")
+        return {
+            "directory": d,
+            "poster_suffix": "-poster.jpg",
+            "fanart_suffix": "-fanart.jpg",
+            "video_extensions": [".mkv"],
+            "ignore_extensions": [],
+            "delete_vsmeta": False,
+            "update_stale_vsmeta": True,
+            "max_workers": 1,
+            "compress_image": False,
+            "compress_kb": 200,
+        }
+
+    def test_stale_source_reconverts(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._make_env(d)
+            stats = n2v.process_files(dict(cfg))
+            self.assertEqual(stats["success"], 1)
+            # nfo 更新（mtime 改为未来）→ 再次运行应重转而不是跳过
+            future = os.path.getmtime(os.path.join(d, "m.nfo")) + 100
+            os.utime(os.path.join(d, "m.nfo"), (future, future))
+            stats = n2v.process_files(dict(cfg))
+            self.assertEqual(stats["success"], 1)
+            self.assertEqual(stats["skipped"], 0)
+
+    def test_fresh_vsmeta_skips(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._make_env(d)
+            n2v.process_files(dict(cfg))
+            # vsmeta 比源文件新 → 跳过
+            stats = n2v.process_files(dict(cfg))
+            self.assertEqual(stats["skipped"], 1)
+
+    def test_stale_disabled_skips(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = self._make_env(d)
+            n2v.process_files(dict(cfg))
+            future = os.path.getmtime(os.path.join(d, "m.nfo")) + 100
+            os.utime(os.path.join(d, "m.nfo"), (future, future))
+            cfg["update_stale_vsmeta"] = False
+            stats = n2v.process_files(dict(cfg))
+            self.assertEqual(stats["skipped"], 1)
+
+
+class AtomicWriteTestCase(unittest.TestCase):
+    def test_no_tmp_leftover_after_convert(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "m.nfo"), "wb") as f:
+                f.write(make_nfo())
+            open(os.path.join(d, "m.mkv"), "wb").write(b"x")
+            cfg = {
+                "directory": d,
+                "poster_suffix": "-poster.jpg",
+                "fanart_suffix": "-fanart.jpg",
+                "video_extensions": [".mkv"],
+                "ignore_extensions": [],
+                "delete_vsmeta": False,
+                "max_workers": 1,
+                "compress_image": False,
+                "compress_kb": 200,
+            }
+            n2v.process_files(dict(cfg))
+            vsmeta = os.path.join(d, "m.mkv.vsmeta")
+            self.assertTrue(os.path.exists(vsmeta))
+            # 不应残留临时文件
+            leftovers = [f for f in os.listdir(d) if f.endswith(".tmp")]
+            self.assertEqual(leftovers, [])
+            # vsmeta 内容可解析
+            with open(vsmeta, "rb") as f:
+                fields = n2v.parse_vsmeta_fields(f.read())
+            self.assertIn(n2v.TAG_SHOW_TITLE, fields)
+
+
+class VerifyEnhancedTestCase(unittest.TestCase):
+    def _meta(self, **overrides):
+        meta = {
+            "title": "电影",
+            "sorttitle": "",
+            "tagline": "",
+            "plot": "简介",
+            "year": "2000",
+            "level": "R",
+            "date": "2000-01-01",
+            "rate": "8.0",
+            "genre": ["科幻"],
+            "actors": ["演员A", "演员B"],
+            "directors": [],
+            "writers": [],
+            "studio": [],
+        }
+        meta.update(overrides)
+        return meta
+
+    def _build(self, meta):
+        cfg = {"compress_image": False, "compress_kb": 200, "studio_as_tagline": False}
+        return bytes(n2v.build_vsmeta_content(meta, "/nonexist.jpg", "/nonexist.jpg", cfg))
+
+    def test_verify_checks_date_level_actors_pass(self):
+        meta = self._meta()
+        ok, issues = n2v.verify_vsmeta(self._build(meta), meta)
+        self.assertTrue(ok, f"完整元数据自检应通过: {issues}")
+
+    def test_verify_catches_date_mismatch(self):
+        meta = self._meta()
+        bad = dict(meta, date="1999-12-31")
+        ok, issues = n2v.verify_vsmeta(self._build(meta), bad)
+        self.assertFalse(ok)
+        self.assertTrue(any("日期不符" in i for i in issues))
+
+    def test_verify_catches_level_mismatch(self):
+        meta = self._meta()
+        bad = dict(meta, level="PG-13")
+        ok, issues = n2v.verify_vsmeta(self._build(meta), bad)
+        self.assertFalse(ok)
+        self.assertTrue(any("分级不符" in i for i in issues))
+
+    def test_verify_catches_actor_count_mismatch(self):
+        meta = self._meta()
+        bad = dict(meta, actors=["演员A", "演员B", "演员C"])
+        ok, issues = n2v.verify_vsmeta(self._build(meta), bad)
+        self.assertFalse(ok)
+        self.assertTrue(any("演员数量不符" in i for i in issues))
+
+    def test_verify_skips_actor_check_when_empty(self):
+        # nfo 无演员时不校验演员数量（避免误报）
+        meta = self._meta(actors=[])
+        ok, issues = n2v.verify_vsmeta(self._build(meta), meta)
+        self.assertTrue(ok, f"无演员场景应通过: {issues}")
+
+
+class ExitCodeTestCase(unittest.TestCase):
+    def _run(self, d, args):
+        return subprocess.run(
+            [sys.executable, os.path.join(ROOT, "nfo-to-vsmeta.1.0.py")] + args,
+            cwd=d,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_success_exit_zero(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self._run(d, ["--dry-run", "--directory", "/nonexistent"])
+            self.assertEqual(r.returncode, 0, r.stderr[-500:])
+
+    def test_failure_exit_one(self):
+        with tempfile.TemporaryDirectory() as d:
+            # 坏 nfo（非 XML）→ 处理失败 → 退出码 1
+            with open(os.path.join(d, "m.nfo"), "wb") as f:
+                f.write(b"<not-xml")
+            with open(os.path.join(d, "m.mkv"), "wb") as f:
+                f.write(b"x")
+            r = self._run(d, ["--directory", d])
+            self.assertEqual(r.returncode, 1, r.stderr[-500:])
+
+    def test_version_exit_zero(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self._run(d, ["--version"])
+            self.assertEqual(r.returncode, 0)
+            self.assertIn("nfo-to-vsmeta", r.stdout)
 
 
 if __name__ == "__main__":

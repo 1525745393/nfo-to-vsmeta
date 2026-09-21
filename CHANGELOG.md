@@ -23,7 +23,14 @@
 - 性能基准工具 `scripts/benchmark.py`：合成数据测量 nfo→vsmeta 转换吞吐，供跨版本对比；
 - 主脚本新增 `--check-update`：查询 GitHub Releases 提示新版本（联网失败静默，不影响转换）；
 - 发布包安全增强：Release 附件增加 SHA256SUMS 校验和，工作流自动验证发布包解压后 `--version` 一致；
-- 预发布支持：`vX.Y.Z-rcN` 标签自动标记为 Prerelease，可先发布到测试环境验证。
+- 预发布支持：`vX.Y.Z-rcN` 标签自动标记为 Prerelease，可先发布到测试环境验证；
+- 源文件更新自动重转：nfo/海报/背景图比 vsmeta 新时自动重新转换（配置 `update_stale_vsmeta`，默认开）；
+- vsmeta 原子写入：先写临时文件再替换，中断不会留下损坏文件；
+- 主脚本新增 `--quiet`：终端只显示警告与错误（日志仍完整写入文件）；
+- 多集命名支持：`S01E02E03` 合辑自动取第一集号；
+- 配置校验：`config.json` 类型错误在启动时即明确报错，不再运行期崩溃；
+- 退出码：转换有失败时返回 1，可被群晖任务计划/脚本化调用感知；
+- 仓库新增 `LICENSE`（MIT）、`CONTRIBUTING.md`、issue/PR 模板与 CodeQL 安全扫描。
 
 ### 修复
 
@@ -31,7 +38,8 @@
 
 - CI 提速：pip / ruff / mypy 缓存、同分支新提交自动取消旧运行、发布校验从测试矩阵中抽出独立执行一次；
 - CI 新增 smoke 测试（`--version` 与 CLI 冒烟），测试矩阵保持 Python 3.8–3.12；
-- `check_release.py --check-tag` 兼容预发布 tag（`v1.3.0-rc1` 也视为已打 tag）。
+- `check_release.py --check-tag` 兼容预发布 tag（`v1.3.0-rc1` 也视为已打 tag）；
+- `--verify` 自检增强：新增日期、分级、演员数量校验（parse_vsmeta_fields 现保留字符串字段内容）。
 
 ### 废弃
 

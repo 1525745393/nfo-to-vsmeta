@@ -1,16 +1,13 @@
-name: CI
+name: Lint and Test
 
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
-permissions:
-  contents: read
-
-# 同一分支/PR 的新提交自动取消旧运行，节省 Actions 时间
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,22 +19,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip" # pip 下载缓存
-      - name: Install dev tools
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: 安装 ruff 与 mypy
         run: pip install ruff mypy
-      - name: Cache ruff & mypy
-        uses: actions/cache@v4
+      - name: ruff check
+        run: ruff check . --cache-dir .ruff_cache
+      - name: ruff format --check
+        run: ruff format --check . --cache-dir .ruff_cache
+      - name: mypy
+        run: mypy --cache-dir .mypy_cache
+      - uses: actions/cache@v4
         with:
           path: |
             .ruff_cache
             .mypy_cache
-          key: ${{ runner.os }}-lint-${{ hashFiles('pyproject.toml', 'nfo-to-vsmeta.1.0.py', 'version.py', 'scripts/check_release.py', 'scripts/build_release.py', 'scripts/release.py', 'tests/*.py') }}
-      - name: Ruff lint
-        run: ruff check . --cache-dir .ruff_cache
-      - name: Ruff format check
-        run: ruff format --check .
-      - name: Mypy type check
-        run: mypy --cache-dir .mypy_cache
+          key: lint-${{ hashFiles('pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            lint-${{ hashFiles('pyproject.toml') }}-
+            lint-
 
   test:
     name: Test on Python ${{ matrix.python-version }}
@@ -51,12 +51,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
-      - name: Smoke test (--version 与 CLI)
-        run: |
-          python nfo-to-vsmeta.1.0.py --version
-          python nfo-to-vsmeta.1.0.py --dry-run --directory /nonexistent 2>&1 | tail -1
+      - name: 单元测试（含 CLI 退出码冒烟）
+        run: python -m unittest discover -s tests
+      - name: smoke（--version）
+        run: python nfo-to-vsmeta.1.0.py --version
 
   release-check:
     name: Release Pre-check
@@ -68,3 +66,20 @@ jobs:
           python-version: "3.12"
       - name: 发布前验证（版本号/CHANGELOG/单元测试）
         run: python scripts/check_release.py --run-tests
+
+  codeql:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # 上传 SARIF 结果
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["python"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3

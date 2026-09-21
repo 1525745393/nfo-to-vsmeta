@@ -29,6 +29,8 @@ RELEASE_FILES = [
     "README.md",
     "CHANGELOG.md",
     "RELEASING.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
 ]
 
 

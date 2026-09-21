@@ -14,6 +14,7 @@ nfo-to-vsmeta（统一版）
 import os
 import io
 import re
+import sys
 import json
 import time
 import logging
@@ -54,8 +55,10 @@ DEFAULT_CONFIG = {
         ".png",
         ".db",
         ".log",
-    ],  # 扫描时忽略的文件扩展名
+        ".tmp",
+    ],  # 扫描时忽略的文件扩展名（含原子写入的临时文件）
     "delete_vsmeta": False,  # 是否先删除已有的 vsmeta 文件再重新转换
+    "update_stale_vsmeta": True,  # 源文件（nfo/海报/背景）比 vsmeta 新时自动重新转换
     "max_workers": 4,  # 多线程并发数
     "compress_image": True,  # 是否压缩图片（需要安装 Pillow，未安装时自动跳过压缩）
     "compress_kb": 200,  # 图片压缩目标大小（KB）
@@ -95,10 +98,25 @@ TAG3_TIMESTAMP = 0x18
 
 INT_TAGS = (TAG_HEADER, TAG_YEAR, TAG_EPISODE_LOCKED, TAG_RATING, TAG3_TIMESTAMP)
 GROUP_TAGS = (TAG_GROUP1, TAG_GROUP2, TAG_FANART)
+# 字符串值 tag：解析时保留内容（bytes），供自检比较
+STRING_TAGS = (
+    TAG_SHOW_TITLE,
+    TAG_SHOW_TITLE2,
+    TAG_EPISODE_TITLE,
+    TAG_EPISODE_RELEASE_DATE,
+    TAG_CHAPTER_SUMMARY,
+    TAG_EPISODE_META_JSON,
+    TAG_CLASSIFICATION,
+)
 
 
-def setup_logging(log_file: str = "process.log", max_bytes: int = 1048576, backup_count: int = 3):
-    """配置日志输出到文件（轮转）与终端"""
+def setup_logging(
+    log_file: str = "process.log",
+    max_bytes: int = 1048576,
+    backup_count: int = 3,
+    quiet: bool = False,
+):
+    """配置日志输出到文件（轮转）与终端；quiet 时终端只显示 WARNING 及以上"""
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.handlers.clear()
@@ -109,6 +127,8 @@ def setup_logging(log_file: str = "process.log", max_bytes: int = 1048576, backu
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
+    if quiet:
+        stream_handler.setLevel(logging.WARNING)
     root.addHandler(file_handler)
     root.addHandler(stream_handler)
 
@@ -123,8 +143,29 @@ def create_default_config(config_file: str):
         logging.error(f"无法创建默认配置文件: {e}")
 
 
+def validate_config(config: dict) -> None:
+    """校验配置项类型，尽早暴露配置错误（替代运行期崩溃）"""
+    errors = []
+    if not isinstance(config.get("directory"), (str, list)) or (
+        isinstance(config.get("directory"), list) and not config["directory"]
+    ):
+        errors.append("directory 必须是字符串或非空列表")
+    if not isinstance(config.get("poster_suffix"), str) or not isinstance(
+        config.get("fanart_suffix"), str
+    ):
+        errors.append("poster_suffix / fanart_suffix 必须是字符串")
+    if not isinstance(config.get("video_extensions"), list) or not config["video_extensions"]:
+        errors.append("video_extensions 必须是非空列表")
+    if not isinstance(config.get("max_workers"), int) or config["max_workers"] < 1:
+        errors.append("max_workers 必须是 >= 1 的整数")
+    if not isinstance(config.get("compress_kb"), int) or config["compress_kb"] < 1:
+        errors.append("compress_kb 必须是 >= 1 的整数")
+    if errors:
+        raise ValueError("配置错误: " + "; ".join(errors))
+
+
 def load_config(config_file: str = "config.json") -> dict:
-    """从 config.json 文件加载配置"""
+    """从 config.json 文件加载配置并校验"""
     if not os.path.exists(config_file):
         logging.warning(f"配置文件 {config_file} 不存在，创建默认配置文件...")
         create_default_config(config_file)
@@ -133,6 +174,7 @@ def load_config(config_file: str = "config.json") -> dict:
     # 合并默认值，避免配置项缺失时报错
     for key, value in DEFAULT_CONFIG.items():
         config.setdefault(key, value)
+    validate_config(config)
     return config
 
 
@@ -191,6 +233,22 @@ def process_files(config: dict, dry_run: bool = False, verify: bool = False) -> 
     return stats
 
 
+def is_stale(vsmeta_path: str, nfo_path: str, poster_path: str, fanart_path: str) -> bool:
+    """判断 vsmeta 是否过期：任一源文件（nfo/海报/背景）比 vsmeta 新则需重转"""
+    try:
+        vsmeta_mtime = os.path.getmtime(vsmeta_path)
+    except OSError:
+        return True
+    for src in (nfo_path, poster_path, fanart_path):
+        if os.path.exists(src):
+            try:
+                if os.path.getmtime(src) > vsmeta_mtime:
+                    return True
+            except OSError:
+                continue
+    return False
+
+
 def process_single_file(
     root: str, filename: str, config: dict, dry_run: bool = False, verify: bool = False
 ) -> str:
@@ -214,12 +272,18 @@ def process_single_file(
             logging.error(f"无法删除 vsmeta 文件 {vsmeta_path}: {e}")
 
     if os.path.exists(vsmeta_path):
-        return "skipped"
+        # 源文件更新时自动重转（重刮削后元数据同步）
+        if not config.get("update_stale_vsmeta", True) or not is_stale(
+            vsmeta_path, nfo_path, poster_path, fanart_path
+        ):
+            return "skipped"
+        logging.info(f"源文件已更新，重新转换: {vsmeta_path}")
 
     if not os.path.exists(nfo_path):
         logging.warning(f"缺少 .nfo 文件，已跳过: {nfo_path}")
         return "skipped"
 
+    tmp_path = None
     try:
         if dry_run:
             logging.info(f"[dry-run] 将转换: {nfo_path} -> {vsmeta_path}")
@@ -231,8 +295,11 @@ def process_single_file(
         )
         buf = build_vsmeta_content(metadata, poster_path, fanart_path, config, season, episode)
 
-        with open(vsmeta_path, "wb") as op:
+        # 原子写入：先写临时文件再替换，避免中途崩溃留下损坏的半成品
+        tmp_path = vsmeta_path + ".tmp"
+        with open(tmp_path, "wb") as op:
             op.write(buf)
+        os.replace(tmp_path, vsmeta_path)
         logging.info(f"成功创建 vsmeta 文件: {vsmeta_path}")
 
         if verify:
@@ -243,6 +310,12 @@ def process_single_file(
                 logging.error(f"自检失败: {vsmeta_path} -> {'; '.join(issues)}")
         return "success"
     except Exception as e:
+        # 清理可能残留的临时文件
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         logging.error(f"处理文件 {nfo_path} 时出错: {e}", exc_info=True)
         return "failed"
 
@@ -289,7 +362,7 @@ def parse_season_episode(filename: str, enable_trailing_digits: bool = False):
     无法识别返回 (None, None)"""
     base = os.path.splitext(os.path.basename(filename))[0]
 
-    m = re.search(r"[Ss](\d{1,2})[Ee](\d{1,3})", base)
+    m = re.search(r"[Ss](\d{1,2})[Ee](\d{1,3})(?:[Ee]\d{1,3})*", base)
     if m:
         return int(m.group(1)), int(m.group(2))
 
@@ -463,6 +536,35 @@ def verify_vsmeta(data: bytes, metadata: dict, season=None, episode=None):
         except ValueError:
             pass
 
+    # 日期校验（排除默认值 1900-01-01，与年份同理）
+    if metadata.get("date") and metadata["date"] != "1900-01-01":
+        expected_date = metadata["date"].encode("utf-8")
+        if (
+            TAG_EPISODE_RELEASE_DATE not in tag_values
+            or tag_values[TAG_EPISODE_RELEASE_DATE][0] != expected_date
+        ):
+            issues.append(f"日期不符: 期望 {metadata['date']}")
+
+    # 分级校验
+    if metadata.get("level"):
+        expected_level = str(metadata["level"]).encode("utf-8")
+        if (
+            TAG_CLASSIFICATION not in tag_values
+            or tag_values[TAG_CLASSIFICATION][0] != expected_level
+        ):
+            issues.append(f"分级不符: 期望 {metadata['level']}")
+
+    # 演员数量校验（nfo 无演员时不校验，避免误报）
+    actors = metadata.get("actors") or []
+    if actors:
+        g1_values = tag_values.get(TAG_GROUP1)
+        if not g1_values:
+            issues.append("缺少人员分组（演员）")
+        else:
+            g1_fields = parse_group1(g1_values[0])
+            if len(g1_fields.get(TAG1_CAST, [])) != len(actors):
+                issues.append(f"演员数量不符: 期望 {len(actors)}")
+
     # 季/集校验
     if season is not None and episode is not None:
         g2_values = tag_values.get(TAG_GROUP2)
@@ -476,6 +578,19 @@ def verify_vsmeta(data: bytes, metadata: dict, season=None, episode=None):
                 issues.append(f"集号不符: 期望 {episode}")
 
     return (len(issues) == 0), issues
+
+
+def parse_group1(data: bytes) -> dict:
+    """解析 GROUP1 子字段（cast/director/genre/writer，均为字符串值）"""
+    fields: dict = {}
+    pos = 0
+    while pos < len(data):
+        tag, pos = read_varint(data, pos)
+        length, pos = read_varint(data, pos)
+        val = data[pos : pos + length]
+        pos += length
+        fields.setdefault(tag, []).append(val)
+    return fields
 
 
 def parse_group2(data: bytes) -> dict:
@@ -503,6 +618,11 @@ def parse_vsmeta_fields(data):
             sub = data[pos : pos + length]
             pos += length
             fields.setdefault(tag, []).append(sub)
+        elif tag in STRING_TAGS:
+            length, pos = read_varint(data, pos)
+            sval = data[pos : pos + length]
+            pos += length
+            fields.setdefault(tag, []).append(sval)
         else:
             length, pos = read_varint(data, pos)
             pos += length
@@ -651,7 +771,7 @@ def check_update():
         logging.info(f"检查更新失败（忽略）: {e}")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="nfo 转 vsmeta（统一版）")
     parser.add_argument("--version", action="version", version=f"nfo-to-vsmeta {__version__}")
     parser.add_argument("--config", type=str, default="config.json", help="指定配置文件路径")
@@ -670,6 +790,7 @@ def main():
         action="store_true",
         help="检查 GitHub 是否有新版本（联网失败静默，不影响转换）",
     )
+    parser.add_argument("--quiet", action="store_true", help="终端只显示警告与错误（日志仍写文件）")
     args = parser.parse_args()
 
     try:
@@ -678,6 +799,7 @@ def main():
             args.log_file or config.get("log_file", "process.log"),
             int(config.get("log_max_bytes", 1048576)),
             int(config.get("log_backup_count", 3)),
+            quiet=args.quiet,
         )
         if args.check_update:
             check_update()
@@ -697,9 +819,12 @@ def main():
             f"本次处理完成：共 {stats['total']} 个文件，{action} {stats.get('success', 0)} 个，"
             f"失败 {stats.get('failed', 0)} 个，跳过 {stats.get('skipped', 0)} 个"
         )
+        # 退出码：有失败时返回 1，供任务计划/脚本化调用感知
+        return 1 if stats.get("failed", 0) > 0 else 0
     except Exception as e:
         logging.error(f"程序运行出错: {e}", exc_info=True)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
